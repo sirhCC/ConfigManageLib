@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from .schema import Schema
 from .validation import ValidationError
+from .profiles import ProfileManager, ConfigProfile, create_profile_source_path, profile_source_exists
 
 # Try to import watchdog for file watching, fall back to polling if not available
 try:
@@ -55,11 +56,31 @@ class ConfigManager:
     ```
     """
 
-    def __init__(self, schema: Optional[Schema] = None, auto_reload: bool = False, reload_interval: float = 1.0):
+    def __init__(
+        self, 
+        schema: Optional[Schema] = None, 
+        auto_reload: bool = False, 
+        reload_interval: float = 1.0,
+        profile: Optional[str] = None,
+        auto_detect_profile: bool = True
+    ):
         self._config: Dict[str, Any] = {}
         self._sources: List[Any] = []
         self._schema: Optional[Schema] = schema
         self._validated_config: Optional[Dict[str, Any]] = None
+        
+        # Profile management
+        self._profile_manager = ProfileManager()
+        self._current_profile: Optional[str] = None
+        self._auto_detect_profile = auto_detect_profile
+        
+        # Set up the profile
+        if profile:
+            self._profile_manager.set_active_profile(profile)
+            self._current_profile = profile
+        elif auto_detect_profile:
+            detected_profile = self._profile_manager.detect_environment()
+            self._current_profile = detected_profile
         
         # Auto-reload functionality
         self._auto_reload: bool = auto_reload
@@ -538,3 +559,174 @@ class ConfigManager:
             self.stop_watching()
         except Exception:
             pass
+
+    # Profile Management Methods
+    
+    def get_current_profile(self) -> Optional[str]:
+        """
+        Get the name of the currently active profile.
+        
+        Returns:
+            Current profile name or None if no profile is active.
+        """
+        return self._current_profile
+    
+    def set_profile(self, profile: str) -> 'ConfigManager':
+        """
+        Set the active configuration profile and reload sources.
+        
+        Args:
+            profile: Profile name to activate.
+            
+        Returns:
+            Self for method chaining.
+            
+        Raises:
+            ValueError: If profile doesn't exist.
+        """
+        if not self._profile_manager.get_profile(profile):
+            raise ValueError(f"Profile '{profile}' not found")
+        
+        self._current_profile = profile
+        self._profile_manager.set_active_profile(profile)
+        
+        # Reload configuration with new profile
+        self.reload()
+        
+        return self
+    
+    def create_profile(self, name: str, base_profile: Optional[str] = None) -> ConfigProfile:
+        """
+        Create a new configuration profile.
+        
+        Args:
+            name: Profile name.
+            base_profile: Name of base profile to inherit from.
+            
+        Returns:
+            Created ConfigProfile instance.
+        """
+        return self._profile_manager.create_profile(name, base_profile)
+    
+    def get_profile(self, name: Optional[str] = None) -> Optional[ConfigProfile]:
+        """
+        Get a configuration profile.
+        
+        Args:
+            name: Profile name (uses current profile if None).
+            
+        Returns:
+            ConfigProfile instance or None if not found.
+        """
+        return self._profile_manager.get_profile(name or self._current_profile)
+    
+    def list_profiles(self) -> List[str]:
+        """
+        Get a list of all available profile names.
+        
+        Returns:
+            List of profile names.
+        """
+        return self._profile_manager.list_profiles()
+    
+    def get_profile_var(self, key: str, default: Any = None) -> Any:
+        """
+        Get a profile-specific variable from the current profile.
+        
+        Args:
+            key: Variable name.
+            default: Default value if not found.
+            
+        Returns:
+            Variable value or default.
+        """
+        return self._profile_manager.get_profile_var(key, self._current_profile, default)
+    
+    def add_profile_source(
+        self, 
+        base_path: Union[str, Path], 
+        source_type: Optional[str] = None,
+        profile: Optional[str] = None,
+        fallback_to_base: bool = True
+    ) -> 'ConfigManager':
+        """
+        Add a profile-specific configuration source.
+        
+        Args:
+            base_path: Base configuration directory or file path.
+            source_type: Source type ('json', 'yaml', 'toml', 'ini'). Auto-detected if None.
+            profile: Profile name (uses current profile if None).
+            fallback_to_base: If True and profile file doesn't exist, try base file.
+            
+        Returns:
+            Self for method chaining.
+            
+        Example:
+            # Loads config/development.json for development profile
+            config.add_profile_source('config')
+            
+            # Loads app.production.yaml for production profile  
+            config.add_profile_source('app.yaml', profile='production')
+        """
+        from .sources import JsonSource, YamlSource, TomlSource, IniSource
+        
+        profile_name = profile or self._current_profile or 'development'
+        base_path = Path(base_path)
+        
+        # Auto-detect source type from extension
+        if source_type is None:
+            if base_path.suffix:
+                extension = base_path.suffix[1:].lower()  # Remove the dot
+            else:
+                extension = 'json'  # Default to JSON
+        else:
+            extension = source_type.lower()
+        
+        # Create profile-specific path
+        profile_path = create_profile_source_path(base_path, profile_name, extension)
+        
+        # Check if profile file exists
+        if not Path(profile_path).exists() and fallback_to_base:
+            # Fall back to base file if profile file doesn't exist
+            if base_path.is_file() or base_path.suffix:
+                profile_path = str(base_path)
+            else:
+                # Try base file with same extension
+                base_file = base_path / f"base.{extension}"
+                if base_file.exists():
+                    profile_path = str(base_file)
+        
+        # Create appropriate source
+        source_classes = {
+            'json': JsonSource,
+            'yaml': YamlSource,
+            'yml': YamlSource,
+            'toml': TomlSource,
+            'ini': IniSource,
+            'cfg': IniSource
+        }
+        
+        source_class = source_classes.get(extension)
+        if not source_class:
+            raise ValueError(f"Unsupported source type: {extension}")
+        
+        # Add the source
+        try:
+            source = source_class(profile_path)
+            self.add_source(source)
+        except FileNotFoundError:
+            if not fallback_to_base:
+                raise
+            # If fallback is enabled but file still doesn't exist, that's okay
+            # This allows for optional profile-specific configs
+        
+        return self
+    
+    def detect_environment(self) -> str:
+        """
+        Detect the current environment from environment variables.
+        
+        Returns:
+            Detected environment name.
+        """
+        return self._profile_manager.detect_environment()
