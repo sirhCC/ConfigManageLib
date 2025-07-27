@@ -4,7 +4,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 
 ## Features
 
-- 📦 Load configuration from multiple sources (JSON, YAML, TOML, environment variables, and more)
+- 📦 Load configuration from multiple sources (JSON, YAML, TOML, INI/CFG, environment variables, and more)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -28,7 +28,7 @@ pip install configmanagelib
 
 ```python
 from config_manager import ConfigManager
-from config_manager.sources import JsonSource, YamlSource, TomlSource, EnvironmentSource
+from config_manager.sources import JsonSource, YamlSource, TomlSource, IniSource, EnvironmentSource
 
 # Create a new configuration manager
 config = ConfigManager()
@@ -36,6 +36,7 @@ config = ConfigManager()
 # Add sources in order of precedence (lowest to highest)
 config.add_source(YamlSource('config/defaults.yaml'))
 config.add_source(TomlSource('config/app.toml'))
+config.add_source(IniSource('config/app.ini'))
 config.add_source(JsonSource('config/environment.json'))
 config.add_source(EnvironmentSource(prefix='APP_'))
 
@@ -117,6 +118,57 @@ config.add_source(TomlSource('pyproject.toml'))
 debug = config.get_bool('tool.myapp.debug', False)
 workers = config.get_int('tool.myapp.workers', 4)
 ```
+
+### INI/CFG Source
+
+Load configuration from INI or CFG files:
+
+```python
+from config_manager.sources import IniSource
+
+# Load all sections as nested dictionary
+config.add_source(IniSource('config.ini'))
+
+# Load only a specific section as flat dictionary
+config.add_source(IniSource('setup.cfg', section='metadata'))
+```
+
+Example INI file:
+```ini
+# Application Configuration
+[app]
+name = MyApp
+debug = false
+port = 8080
+
+[database]
+host = localhost
+port = 5432
+ssl = true
+
+[features]
+authentication = true
+api = false
+logging = true
+```
+
+**Perfect for Python Projects**: INI sources work excellently with common Python configuration files:
+
+```python
+# Load setup.cfg metadata
+config.add_source(IniSource('setup.cfg', section='metadata'))
+project_name = config.get('name')
+
+# Load pytest configuration
+config.add_source(IniSource('pytest.ini', section='tool:pytest'))
+test_paths = config.get('testpaths')
+
+# Load full configuration with all sections
+config.add_source(IniSource('app.ini'))
+db_host = config.get('database.host')
+```
+
+**Built-in Type Conversion**: Automatically converts string values to appropriate Python types (bool, int, float).
 
 ### JSON Source
 
@@ -223,6 +275,32 @@ pool_size = 5
 authentication = true
 api = true
 web_ui = false
+```
+
+### Multi-Source Configuration with INI
+
+Use INI files as base configuration with other source overrides:
+
+```python
+from config_manager import ConfigManager
+from config_manager.sources import IniSource, JsonSource, EnvironmentSource
+
+# Create configuration manager
+config = ConfigManager()
+
+# Base configuration from INI/CFG
+config.add_source(IniSource('app.ini'))
+
+# Environment-specific overrides from JSON
+config.add_source(JsonSource('config/production.json'))
+
+# Runtime overrides from environment variables
+config.add_source(EnvironmentSource(prefix='APP_'))
+
+# INI configuration with precedence order
+# Environment variables > JSON > INI
+server_port = config.get_int('server.port')
+db_host = config.get('database.host')
 ```
 
 ### Nested Configuration
