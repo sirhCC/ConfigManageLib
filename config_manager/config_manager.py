@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union, cast, overload
 import re
+from .schema import Schema
+from .validation import ValidationError
 
 T = TypeVar('T')
 
@@ -31,9 +33,11 @@ class ConfigManager:
     ```
     """
 
-    def __init__(self):
+    def __init__(self, schema: Optional[Schema] = None):
         self._config: Dict[str, Any] = {}
         self._sources: List[Any] = []
+        self._schema: Optional[Schema] = schema
+        self._validated_config: Optional[Dict[str, Any]] = None
 
     def add_source(self, source: Any) -> 'ConfigManager':
         """
@@ -48,6 +52,8 @@ class ConfigManager:
         """
         self._sources.append(source)
         self._deep_update(self._config, source.load())
+        # Invalidate validated config cache
+        self._validated_config = None
         return self
         
     def _deep_update(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
@@ -76,6 +82,8 @@ class ConfigManager:
         self._config = {}
         for source in self._sources:
             self._deep_update(self._config, source.load())
+        # Invalidate validated config cache
+        self._validated_config = None
 
     def _get_nested(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """
@@ -252,3 +260,85 @@ class ConfigManager:
             return True
         except KeyError:
             return False
+
+    def set_schema(self, schema: Schema) -> 'ConfigManager':
+        """
+        Set the validation schema for this configuration manager.
+        
+        Args:
+            schema: The schema to use for validation
+            
+        Returns:
+            The ConfigManager instance for method chaining.
+        """
+        self._schema = schema
+        # Invalidate validated config cache
+        self._validated_config = None
+        return self
+
+    def validate(self, raise_on_error: bool = True) -> Dict[str, Any]:
+        """
+        Validate the current configuration against the schema.
+        
+        Args:
+            raise_on_error: If True, raise ValidationError on validation failure.
+                          If False, return the configuration as-is even if validation fails.
+            
+        Returns:
+            The validated configuration with type conversions and defaults applied.
+            
+        Raises:
+            ValidationError: If validation fails and raise_on_error is True.
+            ValueError: If no schema has been set.
+        """
+        if self._schema is None:
+            if raise_on_error:
+                raise ValueError("No schema has been set for validation")
+            return self._config
+        
+        # Use cached validated config if available
+        if self._validated_config is not None:
+            return self._validated_config
+        
+        try:
+            validated = self._schema.validate(self._config)
+            self._validated_config = validated
+            return validated
+        except ValidationError:
+            if raise_on_error:
+                raise
+            return self._config
+
+    def is_valid(self) -> bool:
+        """
+        Check if the current configuration is valid according to the schema.
+        
+        Returns:
+            True if the configuration is valid or no schema is set, False otherwise.
+        """
+        if self._schema is None:
+            return True
+        
+        try:
+            self.validate(raise_on_error=True)
+            return True
+        except (ValidationError, ValueError):
+            return False
+
+    def get_validation_errors(self) -> List[str]:
+        """
+        Get a list of validation error messages for the current configuration.
+        
+        Returns:
+            List of error messages. Empty list if configuration is valid or no schema is set.
+        """
+        if self._schema is None:
+            return []
+        
+        try:
+            self.validate(raise_on_error=True)
+            return []
+        except ValidationError as e:
+            return [str(e)]
+        except ValueError as e:
+            return [str(e)]
