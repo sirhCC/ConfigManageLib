@@ -8,18 +8,19 @@ class ConfigManager:
     Manages application configuration from multiple sources.
     
     The ConfigManager allows loading configuration from different sources like 
-    environment variables, JSON files, etc. Sources are processed in the order 
-    they are added, with later sources overriding earlier ones for the same keys.
+    environment variables, JSON files, YAML files, etc. Sources are processed in 
+    the order they are added, with later sources overriding earlier ones for the same keys.
     
     Basic usage:
     ```python
     from config_manager import ConfigManager
-    from config_manager.sources import JsonSource, EnvironmentSource
+    from config_manager.sources import JsonSource, YamlSource, EnvironmentSource
 
     # Create a new configuration manager
     config = ConfigManager()
     
     # Add sources in order of precedence (lowest to highest)
+    config.add_source(YamlSource('config.yaml'))
     config.add_source(JsonSource('config.json'))
     config.add_source(EnvironmentSource(prefix='APP_'))
     
