@@ -7,6 +7,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 - 📦 Load configuration from multiple sources (JSON, YAML, TOML, INI/CFG, remote HTTP/HTTPS, environment variables, and more)
 - 🌐 Remote configuration support with authentication (Bearer tokens, API keys, Basic auth)
 - 🔄 **Configuration File Watching & Auto-Reload** - Automatically reload configuration when files change (zero-downtime updates)
+- 🎯 **Configuration Profiles & Environments** - Environment-specific configurations (development, testing, staging, production)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -264,6 +265,199 @@ config.add_source(remote_source(config_url)
 ```
 
 ## Advanced Usage
+
+### Configuration Profiles & Environments
+
+ConfigManager supports environment-specific configuration profiles, allowing you to manage different settings for development, testing, staging, and production environments.
+
+#### Basic Profile Usage
+
+```python
+from config_manager import ConfigManager
+from config_manager.sources import JsonSource
+
+# Create ConfigManager with explicit profile
+config = ConfigManager(profile='development')
+
+# Or enable automatic environment detection
+config = ConfigManager(auto_detect_profile=True)  # Detects from ENV, NODE_ENV, etc.
+
+# Check current profile
+print(f"Current profile: {config.get_current_profile()}")
+
+# List available profiles
+print(f"Available profiles: {config.list_profiles()}")
+```
+
+#### Default Profiles
+
+ConfigManager comes with predefined profiles:
+
+- **base**: Base configuration (inherited by others)
+- **development**: Debug enabled, verbose logging
+- **testing**: Minimal logging, analytics disabled  
+- **staging**: Production-like with some debug features
+- **production**: Optimized for production, SSL required
+
+Each profile has default variables:
+
+```python
+# Access profile-specific variables
+debug_mode = config.get_profile_var('debug')          # True for development
+log_level = config.get_profile_var('log_level')       # 'DEBUG' for development
+ssl_required = config.get_profile_var('ssl_required') # True for production only
+```
+
+#### Environment Detection
+
+ConfigManager automatically detects the environment from these variables (in order of precedence):
+
+- `ENVIRONMENT`
+- `ENV` 
+- `NODE_ENV`
+- `PYTHON_ENV`
+- `CONFIG_ENV`
+- `APP_ENV`
+
+It also recognizes common aliases:
+- `dev`, `develop`, `local` → `development`
+- `test` → `testing`
+- `stage` → `staging`
+- `prod` → `production`
+
+```python
+import os
+
+# Set environment
+os.environ['ENV'] = 'production'
+
+# ConfigManager will automatically use production profile
+config = ConfigManager(auto_detect_profile=True)
+print(config.get_current_profile())  # 'production'
+```
+
+#### Profile-Specific Configuration Files
+
+Use `add_profile_source()` to load environment-specific configuration files:
+
+```python
+# Directory structure:
+# config/
+#   ├── base.json           # Base configuration
+#   ├── development.json    # Development overrides
+#   ├── testing.json        # Testing overrides  
+#   └── production.json     # Production overrides
+
+config = ConfigManager(profile='development')
+
+# Load base configuration
+config.add_source(JsonSource('config/base.json'))
+
+# Load profile-specific configuration
+config.add_profile_source('config')  # Loads config/development.json
+
+# The method automatically creates the correct path based on current profile
+```
+
+#### Profile Path Utilities
+
+ConfigManager provides utilities for working with profile-specific paths:
+
+```python
+from config_manager.profiles import create_profile_source_path, profile_source_exists
+
+# Create profile-specific paths
+dev_path = create_profile_source_path('config', 'development')
+# Returns: 'config/development.json'
+
+prod_path = create_profile_source_path('app.yaml', 'production') 
+# Returns: 'app.production.yaml'
+
+# Check if profile-specific files exist
+if profile_source_exists('config', 'development'):
+    print("Development config exists")
+```
+
+#### Custom Profiles
+
+Create custom profiles for specific use cases:
+
+```python
+# Create a custom profile inheriting from production
+custom_profile = config.create_profile('demo', base_profile='production')
+
+# Set custom variables
+custom_profile.set_var('feature_flags', {
+    'new_ui': True,
+    'beta_features': True
+})
+custom_profile.set_var('api_timeout', 30)
+
+# Switch to custom profile
+config.set_profile('demo')
+
+# Access custom variables
+features = config.get_profile_var('feature_flags')
+timeout = config.get_profile_var('api_timeout')
+```
+
+#### Profile Switching
+
+Switch between profiles at runtime:
+
+```python
+# Start with development
+config = ConfigManager(profile='development')
+config.add_source(JsonSource('app.json'))
+
+print(f"Debug mode: {config.get_profile_var('debug')}")  # True
+
+# Switch to production
+config.set_profile('production')
+config.reload()  # Reload configuration with new profile
+
+print(f"Debug mode: {config.get_profile_var('debug')}")  # False
+print(f"SSL required: {config.get_profile_var('ssl_required')}")  # True
+```
+
+#### Complete Profile Example
+
+```python
+import os
+from config_manager import ConfigManager
+from config_manager.sources import JsonSource, EnvironmentSource
+
+# Set up directory structure with profile-specific configs
+# config/
+#   ├── app.json              # Base application config
+#   ├── development.json      # Dev-specific settings
+#   └── production.json       # Prod-specific settings
+
+# Auto-detect environment (development, staging, production, etc.)
+config = ConfigManager(auto_detect_profile=True)
+
+# Add base configuration
+config.add_source(JsonSource('config/app.json'))
+
+# Add profile-specific configuration (automatically loads correct file)
+config.add_profile_source('config')
+
+# Add environment variables (profile-aware)
+config.add_source(EnvironmentSource(prefix='APP_'))
+
+# Access configuration
+app_name = config.get('app.name')
+database_url = config.get('database.url')
+
+# Access profile-specific variables
+debug = config.get_profile_var('debug')
+log_level = config.get_profile_var('log_level')
+
+print(f"Running {app_name} in {config.get_current_profile()} mode")
+print(f"Debug: {debug}, Log Level: {log_level}")
+```
+
+For complete examples, see [examples/profiles_usage.py](examples/profiles_usage.py).
 
 ### Schema Validation
 
