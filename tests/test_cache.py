@@ -15,7 +15,7 @@ from config_manager.cache import (
     create_cache_key, get_global_cache, set_global_cache, clear_global_cache
 )
 from config_manager.config_manager import ConfigManager
-from config_manager.sources.json_source import JSONSource
+from config_manager.sources import JsonSource
 
 
 class TestCacheKey(unittest.TestCase):
@@ -411,7 +411,7 @@ class TestConfigManagerCaching(unittest.TestCase):
         cm = ConfigManager(cache=cache)
         
         # Add source
-        source = JSONSource(self.config_file)
+        source = JsonSource(self.config_file)
         cm.add_source(source)
         
         # Load config (should cache)
@@ -431,7 +431,7 @@ class TestConfigManagerCaching(unittest.TestCase):
         cache = ConfigCache(MemoryCache())
         cm = ConfigManager(cache=cache)
         
-        source = JSONSource(self.config_file)
+        source = JsonSource(self.config_file)
         cm.add_source(source)
         
         # Load initial config
@@ -451,7 +451,7 @@ class TestConfigManagerCaching(unittest.TestCase):
     def test_cache_key_generation(self):
         """Test cache key generation for sources."""
         cm = ConfigManager()
-        source = JSONSource(self.config_file)
+        source = JsonSource(self.config_file)
         
         # Should generate consistent cache key
         key1 = cm.get_cache_key_for_source(source)
