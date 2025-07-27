@@ -332,11 +332,16 @@ file = false
     
     # Force use of fallback parser
     source = TomlSource(toml_file)
-    print(f"🔧 Parser type: {source._toml_parser[0]}")
+    print(f"🔧 Parser type: {source._parser_info['name']}")
     
     # Override to force simple parser for demonstration
-    source._toml_parser = ("simple", None)
-    print(f"🔧 Forced parser type: {source._toml_parser[0]}")
+    source._parser_info = {
+        "name": "simple",
+        "module": None,
+        "version": "fallback",
+        "method": "r"
+    }
+    print(f"🔧 Forced parser type: {source._parser_info['name']}")
     
     config_data = source.load()
     
