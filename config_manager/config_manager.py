@@ -1,7 +1,19 @@
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union, cast, overload
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union, cast, overload, Callable
 import re
+import threading
+import time
+import os
+from pathlib import Path
 from .schema import Schema
 from .validation import ValidationError
+
+# Try to import watchdog for file watching, fall back to polling if not available
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    WATCHDOG_AVAILABLE = False
 
 T = TypeVar('T')
 
@@ -31,13 +43,36 @@ class ConfigManager:
     db_port = config.get_int('database.port', 5432)
     debug_mode = config.get_bool('debug', False)
     ```
+    
+    Auto-reload usage:
+    ```python
+    # Enable auto-reload for file-based sources
+    config = ConfigManager(auto_reload=True)
+    config.add_source(JsonSource('config.json'))
+    
+    # Register callback for configuration changes
+    config.on_reload(lambda: print("Configuration reloaded!"))
+    ```
     """
 
-    def __init__(self, schema: Optional[Schema] = None):
+    def __init__(self, schema: Optional[Schema] = None, auto_reload: bool = False, reload_interval: float = 1.0):
         self._config: Dict[str, Any] = {}
         self._sources: List[Any] = []
         self._schema: Optional[Schema] = schema
         self._validated_config: Optional[Dict[str, Any]] = None
+        
+        # Auto-reload functionality
+        self._auto_reload: bool = auto_reload
+        self._reload_interval: float = reload_interval
+        self._reload_callbacks: List[Callable[[], None]] = []
+        self._config_lock = threading.RLock()  # Reentrant lock for thread safety
+        self._watched_files: Dict[str, float] = {}  # file_path -> last_modified_time
+        self._observer: Optional[Any] = None
+        self._polling_thread: Optional[threading.Thread] = None
+        self._stop_watching = threading.Event()
+        
+        if self._auto_reload:
+            self._start_watching()
 
     def add_source(self, source: Any) -> 'ConfigManager':
         """
@@ -51,9 +86,16 @@ class ConfigManager:
             The ConfigManager instance for method chaining.
         """
         self._sources.append(source)
-        self._deep_update(self._config, source.load())
-        # Invalidate validated config cache
-        self._validated_config = None
+        
+        # Register file-based sources for auto-reload watching
+        if self._auto_reload and hasattr(source, '_file_path'):
+            self._add_watched_file(source._file_path)
+        
+        with self._config_lock:
+            self._deep_update(self._config, source.load())
+            # Invalidate validated config cache
+            self._validated_config = None
+        
         return self
         
     def _deep_update(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
@@ -79,11 +121,12 @@ class ConfigManager:
         Reloads all configuration sources.
         This is useful when you know that the underlying configuration has changed.
         """
-        self._config = {}
-        for source in self._sources:
-            self._deep_update(self._config, source.load())
-        # Invalidate validated config cache
-        self._validated_config = None
+        with self._config_lock:
+            self._config = {}
+            for source in self._sources:
+                self._deep_update(self._config, source.load())
+            # Invalidate validated config cache
+            self._validated_config = None
 
     def _get_nested(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """
@@ -96,20 +139,21 @@ class ConfigManager:
         Returns:
             The value for the key, or the default if not found.
         """
-        # Handle non-nested keys directly
-        if '.' not in key:
-            return self._config.get(key, default)
-        
-        # Handle nested keys
-        parts = key.split('.')
-        current = self._config
-        
-        for part in parts[:-1]:
-            if part not in current or not isinstance(current[part], dict):
-                return default
-            current = current[part]
+        with self._config_lock:
+            # Handle non-nested keys directly
+            if '.' not in key:
+                return self._config.get(key, default)
             
-        return current.get(parts[-1], default)
+            # Handle nested keys
+            parts = key.split('.')
+            current = self._config
+            
+            for part in parts[:-1]:
+                if part not in current or not isinstance(current[part], dict):
+                    return default
+                current = current[part]
+                
+            return current.get(parts[-1], default)
 
     def get(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """
@@ -342,3 +386,155 @@ class ConfigManager:
             return [str(e)]
         except ValueError as e:
             return [str(e)]
+
+    def on_reload(self, callback: Callable[[], None]) -> 'ConfigManager':
+        """
+        Register a callback function to be called when configuration is reloaded.
+        
+        Args:
+            callback: Function to call when configuration changes. Takes no arguments.
+            
+        Returns:
+            Self for method chaining.
+        """
+        self._reload_callbacks.append(callback)
+        return self
+
+    def remove_reload_callback(self, callback: Callable[[], None]) -> 'ConfigManager':
+        """
+        Remove a previously registered reload callback.
+        
+        Args:
+            callback: The callback function to remove.
+            
+        Returns:
+            Self for method chaining.
+        """
+        if callback in self._reload_callbacks:
+            self._reload_callbacks.remove(callback)
+        return self
+
+    def _start_watching(self) -> None:
+        """Start watching for file changes using the best available method."""
+        if WATCHDOG_AVAILABLE:
+            self._start_watchdog()
+        else:
+            self._start_polling()
+
+    def _start_watchdog(self) -> None:
+        """Start file watching using the watchdog library."""
+        if not WATCHDOG_AVAILABLE:
+            return
+            
+        class ConfigFileHandler(FileSystemEventHandler):
+            def __init__(self, config_manager):
+                self.config_manager = config_manager
+                
+            def on_modified(self, event):
+                if not event.is_directory:
+                    # Check if this is one of our watched files
+                    file_path = os.path.abspath(event.src_path)
+                    if file_path in self.config_manager._watched_files:
+                        self.config_manager._debounced_reload()
+
+        self._observer = Observer()
+        self._file_handler = ConfigFileHandler(self)
+        
+        # Watch all directories containing our config files
+        watched_dirs = set()
+        for file_path in self._watched_files.keys():
+            dir_path = os.path.dirname(file_path)
+            if dir_path not in watched_dirs:
+                self._observer.schedule(self._file_handler, dir_path, recursive=False)
+                watched_dirs.add(dir_path)
+        
+        self._observer.start()
+
+    def _start_polling(self) -> None:
+        """Start file watching using polling as a fallback."""
+        def poll_files():
+            while not self._stop_watching.is_set():
+                try:
+                    changed = False
+                    with self._config_lock:
+                        for file_path, last_mtime in list(self._watched_files.items()):
+                            if os.path.exists(file_path):
+                                current_mtime = os.path.getmtime(file_path)
+                                if current_mtime > last_mtime:
+                                    self._watched_files[file_path] = current_mtime
+                                    changed = True
+                    
+                    if changed:
+                        self._debounced_reload()
+                        
+                except Exception:
+                    # Ignore errors during polling to prevent crash
+                    pass
+                    
+                self._stop_watching.wait(self._reload_interval)
+        
+        self._polling_thread = threading.Thread(target=poll_files, daemon=True)
+        self._polling_thread.start()
+
+    def _debounced_reload(self) -> None:
+        """Reload configuration with debouncing to prevent rapid successive reloads."""
+        # Simple debouncing: wait a short time to batch multiple file changes
+        time.sleep(0.1)
+        
+        try:
+            with self._config_lock:
+                self.reload()
+                
+            # Call all registered callbacks
+            for callback in self._reload_callbacks:
+                try:
+                    callback()
+                except Exception:
+                    # Don't let callback errors break the reload process
+                    pass
+                    
+        except Exception:
+            # Don't let reload errors break the watching process
+            pass
+
+    def _add_watched_file(self, file_path: str) -> None:
+        """Add a file to the watch list."""
+        if not self._auto_reload:
+            return
+            
+        abs_path = os.path.abspath(file_path)
+        if os.path.exists(abs_path):
+            self._watched_files[abs_path] = os.path.getmtime(abs_path)
+            
+            # If using watchdog and observer is running, add new directory watch
+            if WATCHDOG_AVAILABLE and self._observer and self._observer.is_alive():
+                dir_path = os.path.dirname(abs_path)
+                # Check if we're already watching this directory
+                watching_dir = False
+                for watch in self._observer.emitters:
+                    if hasattr(watch, 'watch') and watch.watch.path == dir_path:
+                        watching_dir = True
+                        break
+                
+                if not watching_dir:
+                    self._observer.schedule(self._file_handler, dir_path, recursive=False)
+
+    def stop_watching(self) -> None:
+        """Stop watching for file changes and clean up resources."""
+        self._stop_watching.set()
+        
+        if self._observer:
+            self._observer.stop()
+            self._observer.join(timeout=1.0)
+            self._observer = None
+            
+        if self._polling_thread:
+            self._polling_thread.join(timeout=1.0)
+            self._polling_thread = None
+
+    def __del__(self):
+        """Cleanup when the ConfigManager is destroyed."""
+        try:
+            self.stop_watching()
+        except Exception:
+            pass
