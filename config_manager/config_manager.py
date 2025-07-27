@@ -7,6 +7,7 @@ from pathlib import Path
 from .schema import Schema
 from .validation import ValidationError
 from .profiles import ProfileManager, ConfigProfile, create_profile_source_path, profile_source_exists
+from .cache import ConfigCache, get_global_cache, create_cache_key, hash_config_data
 
 # Try to import watchdog for file watching, fall back to polling if not available
 try:
@@ -62,7 +63,9 @@ class ConfigManager:
         auto_reload: bool = False, 
         reload_interval: float = 1.0,
         profile: Optional[str] = None,
-        auto_detect_profile: bool = True
+        auto_detect_profile: bool = True,
+        cache: Optional[ConfigCache] = None,
+        enable_caching: bool = True
     ):
         self._config: Dict[str, Any] = {}
         self._sources: List[Any] = []
@@ -81,6 +84,12 @@ class ConfigManager:
         elif auto_detect_profile:
             detected_profile = self._profile_manager.detect_environment()
             self._current_profile = detected_profile
+        
+        # Caching setup
+        self._cache = cache if cache is not None else get_global_cache()
+        self._enable_caching = enable_caching
+        if not enable_caching:
+            self._cache.disable()
         
         # Auto-reload functionality
         self._auto_reload: bool = auto_reload
@@ -113,7 +122,8 @@ class ConfigManager:
             self._add_watched_file(source._file_path)
         
         with self._config_lock:
-            self._deep_update(self._config, source.load())
+            source_data = self._load_source_with_cache(source)
+            self._deep_update(self._config, source_data)
             # Invalidate validated config cache
             self._validated_config = None
         
@@ -145,9 +155,86 @@ class ConfigManager:
         with self._config_lock:
             self._config = {}
             for source in self._sources:
-                self._deep_update(self._config, source.load())
+                source_data = self._load_source_with_cache(source)
+                self._deep_update(self._config, source_data)
             # Invalidate validated config cache
             self._validated_config = None
+            
+            # Clear cache if configuration changed significantly
+            if self._enable_caching:
+                self._cache.delete("validated_config")
+    
+    def _load_source_with_cache(self, source: Any) -> Dict[str, Any]:
+        """
+        Load configuration from a source with caching support.
+        
+        Args:
+            source: Configuration source to load.
+            
+        Returns:
+            Configuration data dictionary.
+        """
+        if not self._enable_caching:
+            return source.load()
+        
+        # Generate cache key based on source type and identifier
+        source_id = self._get_source_cache_id(source)
+        
+        # For sources with file paths, include file modification time
+        cache_key = None
+        if hasattr(source, '_file_path'):
+            file_path = getattr(source, '_file_path')
+            if os.path.exists(file_path):
+                mtime = os.path.getmtime(file_path)
+                cache_key = create_cache_key("source", source_id, str(mtime))
+        
+        # For remote sources or sources without files, use content hash
+        if cache_key is None:
+            try:
+                # Try to load and hash the data
+                data = source.load()
+                data_hash = hash_config_data(data)
+                cache_key = create_cache_key("source", source_id, data_hash)
+                
+                # Cache the result
+                self._cache.set(cache_key, data)
+                return data
+            except Exception:
+                # If loading fails, don't cache
+                return source.load()
+        
+        # Check cache first
+        cached_data = self._cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+        
+        # Load from source and cache
+        try:
+            data = source.load()
+            self._cache.set(cache_key, data)
+            return data
+        except Exception:
+            # If loading fails, return empty dict
+            return {}
+    
+    def _get_source_cache_id(self, source: Any) -> str:
+        """Get a unique identifier for a configuration source."""
+        source_type = type(source).__name__
+        
+        # Use file path if available
+        if hasattr(source, '_file_path'):
+            return f"{source_type}:{getattr(source, '_file_path')}"
+        
+        # Use URL for remote sources
+        if hasattr(source, '_url'):
+            return f"{source_type}:{getattr(source, '_url')}"
+        
+        # Use prefix for environment sources
+        if hasattr(source, '_prefix'):
+            return f"{source_type}:{getattr(source, '_prefix')}"
+        
+        # Fallback to type and object id
+        return f"{source_type}:{id(source)}"
 
     def _get_nested(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """
@@ -730,3 +817,70 @@ class ConfigManager:
             Detected environment name.
         """
         return self._profile_manager.detect_environment()
+    
+    # Cache management methods
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """
+        Get cache statistics and performance metrics.
+        
+        Returns:
+            Dictionary containing cache statistics.
+        """
+        return self._cache.get_stats()
+    
+    def clear_cache(self) -> None:
+        """Clear all cached configuration data."""
+        self._cache.clear()
+    
+    def enable_caching(self) -> None:
+        """Enable configuration caching."""
+        self._enable_caching = True
+        self._cache.enable()
+    
+    def disable_caching(self) -> None:
+        """Disable configuration caching."""
+        self._enable_caching = False
+        self._cache.disable()
+    
+    def is_caching_enabled(self) -> bool:
+        """Check if caching is enabled."""
+        return self._enable_caching and self._cache.enabled
+    
+    def set_cache(self, cache: ConfigCache) -> None:
+        """
+        Set a custom cache instance.
+        
+        Args:
+            cache: ConfigCache instance to use.
+        """
+        self._cache = cache
+    
+    def get_cache_key_for_source(self, source: Any) -> str:
+        """
+        Get the cache key that would be used for a source.
+        
+        Args:
+            source: Configuration source.
+            
+        Returns:
+            Cache key string.
+        """
+        source_id = self._get_source_cache_id(source)
+        
+        if hasattr(source, '_file_path'):
+            file_path = getattr(source, '_file_path')
+            if os.path.exists(file_path):
+                mtime = os.path.getmtime(file_path)
+                return create_cache_key("source", source_id, str(mtime))
+        
+        return create_cache_key("source", source_id, "dynamic")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """
+        Get the full configuration as a dictionary.
+        
+        Returns:
+            Complete configuration dictionary.
+        """
+        return self._config.copy()
