@@ -4,7 +4,8 @@ A modern, flexible, and type-safe configuration management library for Python.
 
 ## Features
 
-- 📦 Load configuration from multiple sources (JSON, YAML, TOML, INI/CFG, environment variables, and more)
+- 📦 Load configuration from multiple sources (JSON, YAML, TOML, INI/CFG, remote HTTP/HTTPS, environment variables, and more)
+- 🌐 Remote configuration support with authentication (Bearer tokens, API keys, Basic auth)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -28,7 +29,10 @@ pip install configmanagelib
 
 ```python
 from config_manager import ConfigManager
-from config_manager.sources import JsonSource, YamlSource, TomlSource, IniSource, EnvironmentSource
+from config_manager.sources import (
+    JsonSource, YamlSource, TomlSource, IniSource, 
+    EnvironmentSource, RemoteSource
+)
 
 # Create a new configuration manager
 config = ConfigManager()
@@ -38,6 +42,7 @@ config.add_source(YamlSource('config/defaults.yaml'))
 config.add_source(TomlSource('config/app.toml'))
 config.add_source(IniSource('config/app.ini'))
 config.add_source(JsonSource('config/environment.json'))
+config.add_source(RemoteSource('https://config.example.com/api/config'))
 config.add_source(EnvironmentSource(prefix='APP_'))
 
 # Access configuration values
@@ -190,6 +195,69 @@ from config_manager.sources import EnvironmentSource
 # Load all environment variables with the APP_ prefix
 # For example, APP_DATABASE_HOST will be available as DATABASE_HOST
 config.add_source(EnvironmentSource(prefix='APP_'))
+```
+
+### Remote Configuration Source
+
+Load configuration from remote HTTP/HTTPS endpoints for centralized configuration management:
+
+```python
+from config_manager.sources import RemoteSource, remote_source
+
+# Basic usage
+config.add_source(RemoteSource('https://config.example.com/api/config'))
+
+# Using the fluent builder API with authentication
+source = remote_source('https://config.example.com/api/config') \
+    .with_bearer_token('your-token-here') \
+    .with_header('X-Client-Version', '1.0.0') \
+    .with_timeout(30.0) \
+    .build()
+
+config.add_source(source)
+```
+
+**Authentication Support**: Multiple authentication methods are supported:
+
+```python
+# Bearer Token Authentication
+source = remote_source(url).with_bearer_token('token123').build()
+
+# API Key Authentication
+source = remote_source(url).with_api_key('key123', 'X-API-Key').build()
+
+# Basic Authentication
+source = remote_source(url).with_basic_auth('user', 'pass').build()
+
+# Custom Headers
+source = remote_source(url) \
+    .with_header('Authorization', 'Custom auth-scheme') \
+    .with_header('X-Service', 'ConfigManager') \
+    .build()
+```
+
+**Configuration Options**:
+
+```python
+source = remote_source('https://config.example.com/config.json') \
+    .with_timeout(30.0) \           # Request timeout in seconds
+    .with_ssl_verify(True) \        # SSL certificate verification
+    .with_user_agent('MyApp/1.0') \ # Custom User-Agent header
+    .build()
+```
+
+**Perfect for Cloud-Native Applications**: Ideal for microservices, containerized applications, and cloud deployments where configuration needs to be centralized and dynamically updated.
+
+```python
+# Environment-specific configuration
+env = os.getenv('ENVIRONMENT', 'production')
+config_url = f'https://config-service.example.com/api/config/{env}'
+
+config = ConfigManager()
+config.add_source(remote_source(config_url)
+    .with_bearer_token(os.getenv('CONFIG_TOKEN'))
+    .with_timeout(10.0)
+    .build())
 ```
 
 ## Advanced Usage
