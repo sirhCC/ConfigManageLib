@@ -4,7 +4,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 
 ## Features
 
-- 📦 Load configuration from multiple sources (JSON, environment variables, and more)
+- 📦 Load configuration from multiple sources (JSON, YAML, environment variables, and more)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -21,13 +21,13 @@ pip install configmanagelib
 
 ```python
 from config_manager import ConfigManager
-from config_manager.sources import JsonSource, EnvironmentSource
+from config_manager.sources import JsonSource, YamlSource, EnvironmentSource
 
 # Create a new configuration manager
 config = ConfigManager()
 
 # Add sources in order of precedence (lowest to highest)
-config.add_source(JsonSource('config/defaults.json'))
+config.add_source(YamlSource('config/defaults.yaml'))
 config.add_source(JsonSource('config/environment.json'))
 config.add_source(EnvironmentSource(prefix='APP_'))
 
@@ -42,6 +42,34 @@ api_key = config['api.key']
 ```
 
 ## Configuration Sources
+
+### YAML Source
+
+Load configuration from a YAML file:
+
+```python
+from config_manager.sources import YamlSource
+
+config.add_source(YamlSource('config.yaml'))
+```
+
+Example YAML file:
+```yaml
+app:
+  name: "MyApp"
+  debug: false
+
+database:
+  host: "localhost"
+  port: 5432
+  credentials:
+    username: "admin"
+    password: "secret"
+
+features:
+  - user_registration
+  - email_notifications
+```
 
 ### JSON Source
 
