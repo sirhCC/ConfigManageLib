@@ -13,7 +13,7 @@ from typing import Dict, Any
 
 from config_manager import ConfigManager
 from config_manager.cache import ConfigCache, MemoryCache, FileCache
-from config_manager.sources.json_source import JSONSource
+from config_manager.sources import JsonSource
 
 
 def create_test_config_file(path: str, size: int = 1000) -> None:
@@ -155,7 +155,7 @@ def demonstrate_file_cache():
         # Test file cache persistence
         cache = ConfigCache(FileCache(cache_dir=cache_dir, default_ttl=300.0))
         cm1 = ConfigManager(cache=cache)
-        cm1.add_source(JSONSource(config_file))
+        cm1.add_source(JsonSource(config_file))
         
         print("   Loading configuration (first time)...")
         start_time = time.time()
@@ -167,7 +167,7 @@ def demonstrate_file_cache():
         print("\n2. Simulating application restart...")
         cache2 = ConfigCache(FileCache(cache_dir=cache_dir, default_ttl=300.0))
         cm2 = ConfigManager(cache=cache2)
-        cm2.add_source(JSONSource(config_file))
+        cm2.add_source(JsonSource(config_file))
         
         print("   Loading configuration (from persistent cache)...")
         start_time = time.time()
@@ -202,7 +202,7 @@ def demonstrate_cache_invalidation():
         # Setup ConfigManager with caching
         cache = ConfigCache(MemoryCache(default_ttl=300.0))
         cm = ConfigManager(cache=cache)
-        cm.add_source(JSONSource(config_file))
+        cm.add_source(JsonSource(config_file))
         
         print("1. Loading initial configuration...")
         config1 = cm.get_config()
