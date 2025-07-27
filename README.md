@@ -1082,7 +1082,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - 📖 **Documentation**: Full guides in the `docs/` directory
 - 💬 **Issues**: Report bugs on [GitHub Issues](https://github.com/your-org/ConfigManageLib/issues)
-- 📧 **Email**: support@your-company.com
 - 💬 **Discord**: Join our [community server](https://discord.gg/configmanager)
 
 ---
