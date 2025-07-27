@@ -1,1 +1,10 @@
 PyYAML>=6.0
+
+# Optional dependencies for secrets management
+# cryptography>=3.4.8  # For local encrypted secrets
+# requests>=2.25.0     # For HashiCorp Vault integration  
+# azure-keyvault-secrets>=4.2.0  # For Azure Key Vault
+# azure-identity>=1.5.0          # For Azure authentication
+
+# Optional dependencies for file watching (auto-reload)
+# watchdog>=2.1.0      # For file system monitoring
