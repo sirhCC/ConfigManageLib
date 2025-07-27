@@ -46,8 +46,26 @@ class ConfigManager:
             The ConfigManager instance for method chaining.
         """
         self._sources.append(source)
-        self._config.update(source.load())
+        self._deep_update(self._config, source.load())
         return self
+        
+    def _deep_update(self, target: Dict[str, Any], source: Dict[str, Any]) -> None:
+        """
+        Recursively updates a target dictionary with values from a source dictionary.
+        Unlike dict.update(), this handles nested dictionaries by merging them rather
+        than replacing them.
+        
+        Args:
+            target: The dictionary to update
+            source: The dictionary to get values from
+        """
+        for key, value in source.items():
+            if isinstance(value, dict) and key in target and isinstance(target[key], dict):
+                # If both are dictionaries, recursively merge them
+                self._deep_update(target[key], value)
+            else:
+                # Otherwise just update the value
+                target[key] = value
 
     def reload(self) -> None:
         """
@@ -56,7 +74,7 @@ class ConfigManager:
         """
         self._config = {}
         for source in self._sources:
-            self._config.update(source.load())
+            self._deep_update(self._config, source.load())
 
     def _get_nested(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """
@@ -107,14 +125,16 @@ class ConfigManager:
             
         Returns:
             The value for the key converted to an integer, or the default if not found.
-            
-        Raises:
-            ValueError: If the value cannot be converted to an integer.
+            If the value cannot be converted to an integer, the default is returned.
         """
         value = self._get_nested(key, default)
         if value is None or value == default:
             return default
-        return int(value)
+        
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
 
     def get_float(self, key: str, default: Optional[float] = None) -> Optional[float]:
         """
@@ -126,14 +146,16 @@ class ConfigManager:
             
         Returns:
             The value for the key converted to a float, or the default if not found.
-            
-        Raises:
-            ValueError: If the value cannot be converted to a float.
+            If the value cannot be converted to a float, the default is returned.
         """
         value = self._get_nested(key, default)
         if value is None or value == default:
             return default
-        return float(value)
+        
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
 
     def get_bool(self, key: str, default: Optional[bool] = None) -> Optional[bool]:
         """
@@ -145,6 +167,7 @@ class ConfigManager:
             
         Returns:
             The value for the key converted to a boolean, or the default if not found.
+            If the value cannot be converted to a boolean, the default is returned.
             
         Note:
             String values 'true', 'yes', 'y', 'on', and '1' (case insensitive) are converted to True.
@@ -168,8 +191,8 @@ class ConfigManager:
             if value in ('false', 'no', 'n', 'off', '0'):
                 return False
         
-        # If we got here, we can't convert the value
-        raise ValueError(f"Cannot convert '{value}' to bool")
+        # If we got here, we can't convert the value, so return the default
+        return default
 
     def get_list(self, key: str, default: Optional[List[Any]] = None) -> Optional[List[Any]]:
         """
