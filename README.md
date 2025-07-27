@@ -4,7 +4,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 
 ## Features
 
-- 📦 Load configuration from multiple sources (JSON, YAML, environment variables, and more)
+- 📦 Load configuration from multiple sources (JSON, YAML, TOML, environment variables, and more)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -18,17 +18,24 @@ A modern, flexible, and type-safe configuration management library for Python.
 pip install configmanagelib
 ```
 
+**Optional Dependencies:**
+- For TOML support: `pip install tomli` (Python 3.11+) or `pip install toml`
+- For YAML support: `pip install PyYAML`
+
+*Note: TOML and YAML sources include fallback parsers and will work without external libraries for basic use cases.*
+
 ## Quick Start
 
 ```python
 from config_manager import ConfigManager
-from config_manager.sources import JsonSource, YamlSource, EnvironmentSource
+from config_manager.sources import JsonSource, YamlSource, TomlSource, EnvironmentSource
 
 # Create a new configuration manager
 config = ConfigManager()
 
 # Add sources in order of precedence (lowest to highest)
 config.add_source(YamlSource('config/defaults.yaml'))
+config.add_source(TomlSource('config/app.toml'))
 config.add_source(JsonSource('config/environment.json'))
 config.add_source(EnvironmentSource(prefix='APP_'))
 
@@ -70,6 +77,45 @@ database:
 features:
   - user_registration
   - email_notifications
+```
+
+### TOML Source
+
+Load configuration from a TOML file:
+
+```python
+from config_manager.sources import TomlSource
+
+config.add_source(TomlSource('config.toml'))
+```
+
+Example TOML file:
+```toml
+# Application Configuration
+app_name = "MyApp"
+debug = false
+features = ["user_registration", "email_notifications"]
+
+[database]
+host = "localhost"
+port = 5432
+
+[database.credentials]
+username = "admin"
+password = "secret"
+```
+
+**TOML Library Support**: The TOML source automatically detects and uses available TOML libraries (`tomli` or `toml`). If no library is available, it falls back to a built-in simple parser that handles basic TOML syntax.
+
+**PyProject.toml Support**: Perfect for loading configuration from `pyproject.toml` files:
+
+```python
+# Load tool configuration from pyproject.toml
+config.add_source(TomlSource('pyproject.toml'))
+
+# Access tool-specific settings
+debug = config.get_bool('tool.myapp.debug', False)
+workers = config.get_int('tool.myapp.workers', 4)
 ```
 
 ### JSON Source
@@ -135,6 +181,49 @@ else:
 ```
 
 For detailed schema validation documentation, see [SCHEMA_VALIDATION.md](SCHEMA_VALIDATION.md).
+
+### Multi-Source Configuration with TOML
+
+Combine multiple configuration sources with TOML as the base configuration:
+
+```python
+from config_manager import ConfigManager
+from config_manager.sources import TomlSource, JsonSource, EnvironmentSource
+
+# Create configuration manager
+config = ConfigManager()
+
+# Base configuration from TOML
+config.add_source(TomlSource('app.toml'))
+
+# Environment-specific overrides from JSON
+config.add_source(JsonSource('config/production.json'))
+
+# Runtime overrides from environment variables
+config.add_source(EnvironmentSource(prefix='APP_'))
+
+# TOML configuration takes precedence order into account
+# Environment variables > JSON > TOML
+app_name = config.get('app.name')
+database_url = config.get('database.url')
+```
+
+Example `app.toml`:
+```toml
+[app]
+name = "MyApp"
+version = "1.0.0"
+debug = false
+
+[database]
+url = "sqlite:///app.db"
+pool_size = 5
+
+[features]
+authentication = true
+api = true
+web_ui = false
+```
 
 ### Nested Configuration
 
