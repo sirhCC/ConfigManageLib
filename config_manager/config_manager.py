@@ -8,6 +8,7 @@ from .schema import Schema
 from .validation import ValidationError
 from .profiles import ProfileManager, ConfigProfile, create_profile_source_path, profile_source_exists
 from .cache import ConfigCache, get_global_cache, create_cache_key, hash_config_data
+from .secrets import SecretsManager, get_global_secrets_manager, SecretValue, mask_sensitive_config
 
 # Try to import watchdog for file watching, fall back to polling if not available
 try:
@@ -65,7 +66,9 @@ class ConfigManager:
         profile: Optional[str] = None,
         auto_detect_profile: bool = True,
         cache: Optional[ConfigCache] = None,
-        enable_caching: bool = True
+        enable_caching: bool = True,
+        secrets_manager: Optional[SecretsManager] = None,
+        mask_secrets_in_display: bool = True
     ):
         self._config: Dict[str, Any] = {}
         self._sources: List[Any] = []
@@ -90,6 +93,10 @@ class ConfigManager:
         self._enable_caching = enable_caching
         if not enable_caching:
             self._cache.disable()
+        
+        # Secrets management
+        self._secrets_manager = secrets_manager or get_global_secrets_manager()
+        self._mask_secrets_in_display = mask_secrets_in_display
         
         # Auto-reload functionality
         self._auto_reload: bool = auto_reload
@@ -877,6 +884,170 @@ class ConfigManager:
         return create_cache_key("source", source_id, "dynamic")
     
     def get_config(self) -> Dict[str, Any]:
+        """
+        Get the complete configuration dictionary.
+        
+        Returns:
+            Dictionary containing all configuration values.
+        """
+        with self._config_lock:
+            if self._mask_secrets_in_display:
+                return mask_sensitive_config(self._config)
+            return self._config.copy()
+    
+    def get_raw_config(self) -> Dict[str, Any]:
+        """
+        Get the raw configuration dictionary without masking secrets.
+        
+        Returns:
+            Dictionary containing all configuration values including unmasked secrets.
+        """
+        with self._config_lock:
+            return self._config.copy()
+    
+    # Secrets Management Methods
+    
+    def get_secrets_manager(self) -> SecretsManager:
+        """Get the secrets manager instance."""
+        return self._secrets_manager
+    
+    def set_secret(self, key: str, value: Any, 
+                   provider_name: Optional[str] = None,
+                   metadata: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Store a secret value.
+        
+        Args:
+            key: Secret key
+            value: Secret value to store
+            provider_name: Specific secrets provider to use
+            metadata: Optional metadata for the secret
+        """
+        self._secrets_manager.set_secret(key, value, provider_name, metadata)
+    
+    def get_secret(self, key: str, provider_name: Optional[str] = None) -> Optional[Any]:
+        """
+        Get a secret value.
+        
+        Args:
+            key: Secret key
+            provider_name: Specific secrets provider to use
+            
+        Returns:
+            Secret value or None if not found
+        """
+        secret = self._secrets_manager.get_secret(key, provider_name)
+        return secret.get_value() if secret else None
+    
+    def get_secret_info(self, key: str, provider_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a secret.
+        
+        Args:
+            key: Secret key
+            provider_name: Specific secrets provider to use
+            
+        Returns:
+            Secret information dictionary or None if not found
+        """
+        secret = self._secrets_manager.get_secret(key, provider_name)
+        if secret:
+            return {
+                'key': key,
+                'provider': provider_name,
+                'metadata': secret.metadata,
+                'accessed_count': secret.accessed_count,
+                'created_at': secret.created_at.isoformat(),
+                'last_accessed': secret.last_accessed.isoformat() if secret.last_accessed else None,
+                'is_expired': secret.is_expired(3600)  # 1 hour default TTL check
+            }
+        return None
+    
+    def delete_secret(self, key: str, provider_name: Optional[str] = None) -> bool:
+        """
+        Delete a secret.
+        
+        Args:
+            key: Secret key
+            provider_name: Specific secrets provider to use
+            
+        Returns:
+            True if secret was deleted, False if not found
+        """
+        return self._secrets_manager.delete_secret(key, provider_name)
+    
+    def list_secrets(self, provider_name: Optional[str] = None) -> List[str]:
+        """
+        List available secret keys.
+        
+        Args:
+            provider_name: Specific secrets provider to use
+            
+        Returns:
+            List of secret keys
+        """
+        return self._secrets_manager.list_secrets(provider_name)
+    
+    def rotate_secret(self, key: str, new_value: Any, 
+                     provider_name: Optional[str] = None) -> bool:
+        """
+        Rotate a secret to a new value.
+        
+        Args:
+            key: Secret key
+            new_value: New secret value
+            provider_name: Specific secrets provider to use
+            
+        Returns:
+            True if rotation was successful
+        """
+        return self._secrets_manager.rotate_secret(key, new_value, provider_name)
+    
+    def add_secrets_provider(self, name: str, provider: Any) -> None:
+        """
+        Add a secrets provider.
+        
+        Args:
+            name: Provider name
+            provider: Provider instance implementing SecretProvider protocol
+        """
+        self._secrets_manager.add_provider(name, provider)
+    
+    def get_secrets_stats(self) -> Dict[str, Any]:
+        """
+        Get secrets management statistics.
+        
+        Returns:
+            Dictionary with secrets statistics
+        """
+        return self._secrets_manager.get_stats()
+    
+    def enable_secrets_masking(self, enabled: bool = True) -> None:
+        """
+        Enable or disable secrets masking in configuration display.
+        
+        Args:
+            enabled: Whether to mask secrets in display
+        """
+        self._mask_secrets_in_display = enabled
+    
+    def schedule_secret_rotation(self, key: str, interval_hours: int,
+                               generator_func: Callable[[], Any],
+                               provider_name: Optional[str] = None) -> None:
+        """
+        Schedule automatic secret rotation.
+        
+        Args:
+            key: Secret key to rotate
+            interval_hours: Rotation interval in hours
+            generator_func: Function to generate new secret value
+            provider_name: Specific secrets provider to use
+        """
+        self._secrets_manager.schedule_rotation(key, interval_hours, generator_func, provider_name)
+    
+    def check_secret_rotations(self) -> None:
+        """Check and execute any scheduled secret rotations."""
+        self._secrets_manager.check_rotations()
         """
         Get the full configuration as a dictionary.
         
