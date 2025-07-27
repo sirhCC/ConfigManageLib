@@ -7,5 +7,6 @@ from .environment import EnvironmentSource
 from .json_source import JsonSource
 from .yaml_source import YamlSource
 from .toml_source import TomlSource
+from .ini_source import IniSource
 
-__all__ = ["BaseSource", "EnvironmentSource", "JsonSource", "YamlSource", "TomlSource"]
+__all__ = ["BaseSource", "EnvironmentSource", "JsonSource", "YamlSource", "TomlSource", "IniSource"]
