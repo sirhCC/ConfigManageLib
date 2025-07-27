@@ -6,6 +6,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 
 - 📦 Load configuration from multiple sources (JSON, YAML, TOML, INI/CFG, remote HTTP/HTTPS, environment variables, and more)
 - 🌐 Remote configuration support with authentication (Bearer tokens, API keys, Basic auth)
+- 🔄 **Configuration File Watching & Auto-Reload** - Automatically reload configuration when files change (zero-downtime updates)
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
@@ -34,8 +35,8 @@ from config_manager.sources import (
     EnvironmentSource, RemoteSource
 )
 
-# Create a new configuration manager
-config = ConfigManager()
+# Create a new configuration manager with auto-reload
+config = ConfigManager(auto_reload=True)
 
 # Add sources in order of precedence (lowest to highest)
 config.add_source(YamlSource('config/defaults.yaml'))
@@ -44,6 +45,8 @@ config.add_source(IniSource('config/app.ini'))
 config.add_source(JsonSource('config/environment.json'))
 config.add_source(RemoteSource('https://config.example.com/api/config'))
 config.add_source(EnvironmentSource(prefix='APP_'))
+
+# Configuration will automatically reload when files change!
 
 # Access configuration values
 db_host = config.get('database.host', 'localhost')
@@ -409,6 +412,66 @@ Reload configuration from all sources:
 ```python
 # When configuration sources change (e.g., updated JSON files)
 config.reload()
+```
+
+### Configuration File Watching & Auto-Reload
+
+Automatically reload configuration when files change, enabling zero-downtime configuration updates:
+
+```python
+# Enable auto-reload for file-based sources
+config = ConfigManager(auto_reload=True)
+config.add_source(JsonSource('app.json'))
+config.add_source(YamlSource('config.yaml'))
+
+# Configuration will automatically reload when files change
+# No manual intervention required!
+```
+
+**Callback Support**: Register functions to be called when configuration reloads:
+
+```python
+def on_config_change():
+    print("Configuration updated! Refreshing application state...")
+    # Update application state based on new configuration
+    update_database_pool_size(config.get_int('database.pool_size'))
+    update_log_level(config.get('logging.level'))
+
+# Register callback
+config = ConfigManager(auto_reload=True, reload_interval=1.0)
+config.add_source(JsonSource('app.json'))
+config.on_reload(on_config_change)
+```
+
+**Configuration Options**:
+
+```python
+# Customize auto-reload behavior
+config = ConfigManager(
+    auto_reload=True,           # Enable auto-reload
+    reload_interval=0.5         # Check for changes every 0.5 seconds
+)
+
+# Multiple callbacks are supported
+config.on_reload(update_cache_settings)
+config.on_reload(refresh_feature_flags)
+config.on_reload(log_config_change)
+
+# Remove callbacks when no longer needed
+config.remove_reload_callback(update_cache_settings)
+```
+
+**File Watching Technology**: Auto-reload uses the `watchdog` library for efficient file monitoring when available, with automatic fallback to polling for maximum compatibility.
+
+**Production Benefits**:
+- **Zero-downtime updates**: Change configuration without restarting applications
+- **Feature flag updates**: Enable/disable features in real-time
+- **Scaling adjustments**: Modify connection pools, timeouts, and limits dynamically
+- **Environment transitions**: Switch between configurations seamlessly
+
+**Installation for Optimal Performance**:
+```bash
+pip install watchdog  # Optional: For better file watching performance
 ```
 
 ## Contributing
