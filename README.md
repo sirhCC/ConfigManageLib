@@ -8,6 +8,7 @@ A modern, flexible, and type-safe configuration management library for Python.
 - 🔄 Override configuration values with a defined order of precedence
 - 🌳 Support for nested configuration values using dot notation
 - 🧩 Type conversion helpers for common data types (int, float, bool, list)
+- ✅ Schema validation with type checking, defaults, and validation rules
 - 🔄 Easy reloading of configuration when sources change
 - 📝 Comprehensive documentation and test coverage
 
@@ -94,6 +95,46 @@ config.add_source(EnvironmentSource(prefix='APP_'))
 ```
 
 ## Advanced Usage
+
+### Schema Validation
+
+Define schemas to validate configuration structure, types, and values:
+
+```python
+from config_manager import ConfigManager
+from config_manager.schema import Schema, String, Integer, Boolean
+from config_manager.validation import RangeValidator, ChoicesValidator
+
+# Define a schema
+schema = Schema({
+    "app_name": String(required=True),
+    "port": Integer(default=8080, validators=[RangeValidator(min_value=1024, max_value=65535)]),
+    "debug": Boolean(default=False),
+    "log_level": String(default="INFO", validators=[ChoicesValidator(["DEBUG", "INFO", "WARNING", "ERROR"])])
+})
+
+# Create ConfigManager with schema
+config = ConfigManager(schema=schema)
+config.add_source(JsonSource('config.json'))
+
+# Validate configuration
+try:
+    validated_config = config.validate()
+    print(f"App: {validated_config['app_name']}")
+    print(f"Port: {validated_config['port']}")  # Automatically converted to int
+except ValidationError as e:
+    print(f"Configuration error: {e}")
+
+# Check if configuration is valid
+if config.is_valid():
+    print("✅ Configuration is valid!")
+else:
+    errors = config.get_validation_errors()
+    for error in errors:
+        print(f"❌ {error}")
+```
+
+For detailed schema validation documentation, see [SCHEMA_VALIDATION.md](SCHEMA_VALIDATION.md).
 
 ### Nested Configuration
 
