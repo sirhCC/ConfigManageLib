@@ -834,7 +834,23 @@ class ConfigManager:
         Returns:
             Dictionary containing cache statistics.
         """
-        return self._cache.get_stats()
+        stats = self._cache.get_stats()
+        
+        # Convert CacheStats dataclass to dictionary for backward compatibility
+        if hasattr(stats, '__dict__'):
+            stats_dict = {}
+            for key, value in stats.__dict__.items():
+                if not key.startswith('_'):
+                    stats_dict[key] = value
+            
+            # Add common aliases for backward compatibility
+            stats_dict['hits'] = stats_dict.get('cache_hits', 0)
+            stats_dict['misses'] = stats_dict.get('cache_misses', 0)
+            
+            return stats_dict
+        
+        # Fallback if stats is already a dictionary
+        return stats if isinstance(stats, dict) else {}
     
     def clear_cache(self) -> None:
         """Clear all cached configuration data."""
