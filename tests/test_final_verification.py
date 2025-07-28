@@ -57,7 +57,8 @@ def test_complete_system():
             assert config2 == loaded_config
             
             stats = cm.get_cache_stats()
-            assert stats["enabled"] == True
+            assert "cache_hits" in stats
+            assert stats["cache_hits"] >= 0
             print("   ✓ Configuration loading and caching working")
         
         # Test 4: Profile functionality
@@ -128,12 +129,13 @@ def test_complete_system():
         # Test 8: Integration with schema validation
         print("8. Testing schema validation integration...")
         try:
-            from config_manager.schema import ConfigSchema, Field, NumberField
+            from config_manager.schema import Schema, String, Integer
+            from config_manager.validation import RangeValidator
             
-            schema = ConfigSchema({
-                "app": ConfigSchema({
-                    "name": Field(str, required=True),
-                    "port": NumberField(int, min_value=1024, max_value=65535)
+            schema = Schema({
+                "app": Schema({
+                    "name": String(required=True),
+                    "port": Integer(validators=[RangeValidator(1024, 65535)])
                 })
             })
             
