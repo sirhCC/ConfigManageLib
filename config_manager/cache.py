@@ -549,6 +549,10 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
             
             return True
     
+    def has_key(self, key: str) -> bool:
+        """Alias for exists method (backward compatibility)."""
+        return self.exists(key)
+    
     def get_many(self, keys: List[str]) -> Dict[str, Any]:
         """Get multiple values from the cache efficiently."""
         result = {}
@@ -1062,17 +1066,23 @@ class CacheManager:
     
     def __init__(
         self,
-        config: Optional[CacheConfiguration] = None,
+        config: Optional[Union[CacheConfiguration, EnhancedCacheBackend]] = None,
         backend: Optional[EnhancedCacheBackend] = None
     ):
         """
         Initialize cache manager.
         
         Args:
-            config: Cache configuration (uses defaults if not provided)
+            config: Cache configuration or backend (for backward compatibility)
             backend: Specific cache backend to use (auto-selected if not provided)
         """
-        self.config = config or CacheConfiguration()
+        # Handle backward compatibility - if config is actually a backend
+        if hasattr(config, 'get') and hasattr(config, 'set') and hasattr(config, 'delete'):
+            # config is actually a backend
+            backend = config  # type: ignore
+            config = None
+        
+        self.config = config if isinstance(config, CacheConfiguration) else CacheConfiguration()
         self._logger = logging.getLogger(f"{__name__}.CacheManager")
         
         # Initialize backend
@@ -1205,6 +1215,22 @@ class CacheManager:
             self.backend.clear()
             self.backend = NullCache()
             self._logger.info("Cache disabled")
+    
+    # Backward compatibility methods for ConfigCache interface
+    def cache_config(self, source_id: str, config_data: Any, ttl: Optional[float] = None) -> None:
+        """Cache configuration data for a source (backward compatibility)."""
+        cache_key = f"config:{source_id}"
+        self.set(cache_key, config_data, ttl)
+    
+    def get_config(self, source_id: str) -> Optional[Any]:
+        """Get cached configuration data for a source (backward compatibility)."""
+        cache_key = f"config:{source_id}"
+        return self.get(cache_key)
+    
+    def invalidate(self, source_id: str) -> None:
+        """Invalidate cached configuration for a source (backward compatibility)."""
+        cache_key = f"config:{source_id}"
+        self.delete(cache_key)
     
     def health_check(self) -> Dict[str, Any]:
         """Perform a health check on the cache system."""
