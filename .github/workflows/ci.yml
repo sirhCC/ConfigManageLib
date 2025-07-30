@@ -1,0 +1,456 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+env:
+  PYTHON_DEFAULT: "3.11"
+  CACHE_VERSION: "v1"
+
+jobs:
+  # Code Quality Checks
+  code-quality:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Cache pre-commit hooks
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ env.CACHE_VERSION }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pre-commit tox
+
+    - name: Run pre-commit hooks
+      run: pre-commit run --all-files --show-diff-on-failure
+
+    - name: Run linting with tox
+      run: tox -e lint
+
+    - name: Upload lint results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: lint-results
+        path: .tox/lint/log/
+        retention-days: 7
+
+  # Type Checking
+  type-check:
+    name: Type Checking (mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox
+
+    - name: Run type checking
+      run: tox -e type-check
+
+    - name: Upload mypy results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: mypy-results
+        path: .tox/type-check/log/
+        retention-days: 7
+
+  # Security Scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox
+
+    - name: Run security checks
+      run: tox -e security
+
+    - name: Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          .tox/security/tmp/bandit-report.json
+          .tox/security/tmp/safety-report.json
+        retention-days: 30
+
+  # Multi-Python Testing Matrix
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        exclude:
+          # Reduce matrix size for faster CI
+          - os: macos-latest
+            python-version: "3.8"
+          - os: windows-latest
+            python-version: "3.8"
+          - os: macos-latest
+            python-version: "3.9"
+          - os: windows-latest
+            python-version: "3.9"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox tox-gh-actions
+
+    - name: Run tests with tox
+      run: tox
+      env:
+        PLATFORM: ${{ matrix.os }}
+
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == env.PYTHON_DEFAULT && matrix.os == 'ubuntu-latest'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          coverage.xml
+          .coverage
+        retention-days: 7
+
+  # Performance Benchmarks
+  performance:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'performance')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox
+
+    - name: Run performance benchmarks
+      run: tox -e performance
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: |
+          .benchmarks/
+          benchmark-*.json
+        retention-days: 30
+
+  # Integration Tests
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'integration')
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox
+
+    - name: Run integration tests
+      run: tox -e integration
+      env:
+        REDIS_URL: redis://localhost:6379
+
+    - name: Upload integration test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-results
+        path: |
+          integration-coverage.xml
+          integration-report.html
+        retention-days: 7
+
+  # Documentation Build
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox
+
+    - name: Build documentation
+      run: tox -e docs
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/_build/html/
+        retention-days: 14
+
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/_build/html
+
+  # Coverage Analysis
+  coverage:
+    name: Coverage Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tox coverage[toml]
+
+    - name: Download test artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results-ubuntu-latest-py${{ env.PYTHON_DEFAULT }}
+
+    - name: Generate coverage report
+      run: tox -e coverage
+
+    - name: Coverage comment
+      if: github.event_name == 'pull_request'
+      uses: py-cov-action/python-coverage-comment-action@v3
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MINIMUM_GREEN: 95
+        MINIMUM_ORANGE: 90
+
+  # Package Build & Validation
+  package:
+    name: Package Build & Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [code-quality, type-check, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine check-manifest
+
+    - name: Validate package metadata
+      run: |
+        check-manifest
+        python -m build
+        twine check dist/*
+
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+        retention-days: 14
+
+  # Dependency Security Audit
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_DEFAULT }}
+        cache: 'pip'
+
+    - name: Install pip-audit
+      run: pip install pip-audit
+
+    - name: Run dependency audit
+      run: |
+        pip-audit --desc --format=json --output=dependency-audit.json
+        pip-audit --desc
+
+    - name: Upload audit results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-audit
+        path: dependency-audit.json
+        retention-days: 30
+
+  # Release Deployment
+  deploy:
+    name: Deploy to PyPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [code-quality, type-check, security, test, package, dependency-audit]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    environment:
+      name: pypi
+      url: https://pypi.org/p/configmanagelib
+    
+    permissions:
+      id-token: write  # Required for trusted publishing
+    
+    steps:
+    - name: Download package artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        verbose: true
+        print-hash: true
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [code-quality, type-check, security, test, performance, integration, docs, coverage, package, dependency-audit]
+    if: always()
+    
+    steps:
+    - name: Delete old artifacts
+      uses: geekyeggo/delete-artifact@v2
+      with:
+        name: |
+          lint-results
+          mypy-results
+        failOnError: false
