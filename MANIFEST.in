@@ -1,0 +1,38 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+include pyproject.toml
+
+# Documentation
+recursive-include docs *.md
+recursive-include docs *.rst
+
+# Examples
+recursive-include examples *.py
+recursive-include examples *.json
+recursive-include examples *.yaml
+recursive-include examples *.yml
+recursive-include examples *.toml
+recursive-include examples *.ini
+recursive-include examples *.cfg
+
+# Tests
+recursive-include tests *.py
+
+# Configuration files
+recursive-include config_manager *.py
+include config_manager/py.typed
+
+# Exclude development and temporary files
+exclude .gitignore
+exclude .git/
+exclude .config_cache/
+exclude .test_cache/
+exclude debug_toml_parsing.py
+exclude override_config.json
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude * .pytest_cache
+recursive-exclude * .mypy_cache
