@@ -1,0 +1,60 @@
+# Coverage.py configuration for ConfigManager
+# Official configuration file for test coverage reporting
+
+[run]
+# Source code to analyze
+source = config_manager
+
+# Branch coverage (not just line coverage)
+branch = True
+
+# Parallel processing
+parallel = True
+
+# Data file location
+data_file = .coverage
+
+[report]
+# Reporting options
+precision = 2
+show_missing = True
+skip_covered = False
+sort = Cover
+
+# Exclude lines from coverage
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+    
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+    
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if __name__ == .__main__.:
+    
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+
+# Minimum coverage percentage (fail if below this)
+fail_under = 85
+
+[html]
+# HTML report configuration
+directory = htmlcov
+title = ConfigManager Test Coverage Report
+
+[xml]
+# XML report for CI/CD systems
+output = coverage.xml
+
+[paths]
+# Path mapping for different environments
+source =
+    config_manager/
+    */config_manager/
