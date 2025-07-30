@@ -1,0 +1,209 @@
+# Pre-commit hooks configuration for ConfigManager
+# Install with: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Built-in pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: Trim trailing whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        description: Ensure files end with newline
+      - id: check-yaml
+        description: Validate YAML syntax
+        args: ['--unsafe']
+      - id: check-toml
+        description: Validate TOML syntax
+      - id: check-json
+        description: Validate JSON syntax
+      - id: check-xml
+        description: Validate XML syntax
+      - id: check-merge-conflict
+        description: Check for merge conflict markers
+      - id: check-added-large-files
+        description: Prevent large files from being committed
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+        description: Check for case conflicts in file names
+      - id: check-executables-have-shebangs
+        description: Ensure executables have shebangs
+      - id: check-shebang-scripts-are-executable
+        description: Ensure shebang scripts are executable
+      - id: debug-statements
+        description: Check for debugger imports and breakpoints
+        language: python
+        types: [python]
+      - id: name-tests-test
+        description: Ensure test files are named correctly
+        args: ['--pytest-test-first']
+      - id: requirements-txt-fixer
+        description: Sort requirements.txt files
+      - id: fix-byte-order-marker
+        description: Remove UTF-8 byte order marker
+
+  # Python code formatting with Black
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        description: Format Python code with Black
+        language_version: python3
+        args: ['--line-length=88', '--target-version=py38']
+
+  # Import sorting with isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        description: Sort Python imports with isort
+        args: ['--profile=black', '--line-length=88']
+
+  # Python linting with flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        description: Lint Python code with flake8
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503,E501']
+        additional_dependencies: [
+          flake8-docstrings,
+          flake8-builtins,
+          flake8-comprehensions,
+          flake8-mutable,
+          flake8-pytest-style,
+          flake8-simplify,
+          pep8-naming
+        ]
+
+  # Modern Python linting with Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        description: Fast Python linter (Ruff)
+        args: ['--fix', '--exit-non-zero-on-fix']
+      - id: ruff-format
+        description: Fast Python formatter (Ruff)
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        description: Static type checking with mypy
+        additional_dependencies: [
+          types-PyYAML,
+          types-requests,
+          types-toml,
+          types-setuptools
+        ]
+        args: ['--config-file=mypy.ini']
+        exclude: ^(tests/|examples/|scripts/)
+
+  # Security scanning with bandit
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        description: Security linting for Python
+        args: ['-r', 'config_manager', '-f', 'json']
+        exclude: ^(tests/|examples/|scripts/)
+
+  # Docstring formatting
+  - repo: https://github.com/PyCQA/docformatter
+    rev: v1.7.5
+    hooks:
+      - id: docformatter
+        description: Format Python docstrings
+        args: [
+          '--in-place',
+          '--wrap-summaries=88',
+          '--wrap-descriptions=88',
+          '--make-summary-multi-line',
+          '--close-quotes-on-newline'
+        ]
+
+  # YAML formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        description: Format YAML, JSON, and Markdown files
+        types_or: [yaml, json, markdown]
+        args: ['--write', '--prose-wrap=always', '--print-width=88']
+
+  # Python upgrade syntax
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        description: Upgrade Python syntax
+        args: ['--py38-plus']
+
+  # Remove unused imports
+  - repo: https://github.com/pycqa/autoflake
+    rev: v2.2.1
+    hooks:
+      - id: autoflake
+        description: Remove unused imports and variables
+        args: [
+          '--in-place',
+          '--remove-all-unused-imports',
+          '--remove-unused-variables',
+          '--remove-duplicate-keys',
+          '--ignore-init-module-imports'
+        ]
+
+  # Python docstring coverage
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.5.0
+    hooks:
+      - id: interrogate
+        description: Check Python docstring coverage
+        args: [
+          '--ignore-init-method',
+          '--ignore-module',
+          '--ignore-nested-functions',
+          '--ignore-private',
+          '--ignore-property-decorators',
+          '--ignore-semiprivate',
+          '--fail-under=80',
+          '--verbose',
+          'config_manager'
+        ]
+
+  # Conventional commit messages
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        description: Ensure conventional commit messages
+        stages: [commit-msg]
+        args: [
+          'build', 'chore', 'ci', 'docs', 'feat', 'fix', 
+          'perf', 'refactor', 'revert', 'style', 'test'
+        ]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        description: Lint shell scripts
+        types: [shell]
+
+# Global configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [mypy, bandit, interrogate]  # Skip heavy hooks in CI
+  submodules: false
