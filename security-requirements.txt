@@ -1,0 +1,8 @@
+# Security policy for ConfigManager
+bandit>=1.7.0
+safety>=1.10.0
+
+# Add to pyproject.toml:
+[tool.bandit]
+exclude_dirs = ["tests", "examples"]
+skips = ["B101", "B601"]
