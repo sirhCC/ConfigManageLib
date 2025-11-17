@@ -217,7 +217,3 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Repository**: https://github.com/sirhCC/ConfigManageLib
 - **Issues**: https://github.com/sirhCC/ConfigManageLib/issues
 - **PyPI**: `pip install configmanagelib`
-
----
-
-**Made with ❤️ for Python developers who need reliable configuration management**
