@@ -141,7 +141,7 @@ class EnvironmentSource(BaseSource):
         """
         # Check if this environment variable matches any of our prefixes
         matched_prefix = self._find_matching_prefix(env_key)
-        if not matched_prefix:
+        if matched_prefix is None:
             return None
         
         # Get the key without the prefix

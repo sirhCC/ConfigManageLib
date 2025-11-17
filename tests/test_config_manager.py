@@ -50,7 +50,7 @@ class TestConfigManager(unittest.TestCase):
 
     def test_environment_source(self):
         config = ConfigManager()
-        config.add_source(EnvironmentSource(prefix="TEST_PREFIX_"))
+        config.add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
         self.assertEqual(config.get("ENV_KEY"), "env_value")
 
     def test_override_with_environment_source(self):
@@ -63,7 +63,7 @@ class TestConfigManager(unittest.TestCase):
 
         config = ConfigManager()
         config.add_source(JsonSource(override_json_path))
-        config.add_source(EnvironmentSource(prefix="TEST_OVERRIDE_"))
+        config.add_source(EnvironmentSource(prefix="TEST_OVERRIDE_", nested=False))
 
         self.assertEqual(config.get("KEY_TO_OVERRIDE"), "env_override")
 
@@ -119,7 +119,7 @@ class TestConfigManager(unittest.TestCase):
         self.assertTrue(config.get_bool("NONEXISTENT", True))
         
         # Test from environment variable
-        config.add_source(EnvironmentSource(prefix="TEST_PREFIX_"))
+        config.add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
         self.assertEqual(config.get_int("INT_ENV"), 123)
         self.assertTrue(config.get_bool("BOOL_ENV"))
     
@@ -153,7 +153,7 @@ class TestConfigManager(unittest.TestCase):
         
         # Test actual chaining
         config = ConfigManager()
-        config.add_source(JsonSource(self.test_json_path)).add_source(EnvironmentSource(prefix="TEST_PREFIX_"))
+        config.add_source(JsonSource(self.test_json_path)).add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
         self.assertEqual(config.get("ENV_KEY"), "env_value")
         self.assertEqual(config.get("JSON_KEY"), "json_value")
     
