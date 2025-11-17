@@ -1,4 +1,4 @@
-# � ConfigManager
+# ConfigManager
 
 <div align="center">
 
@@ -8,11 +8,12 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Type Checked](https://img.shields.io/badge/type--checked-mypy-blue.svg)](http://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://pytest.org/)
+[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://pytest.org)
+[![Coverage](https://img.shields.io/badge/coverage-28%25-yellow.svg)](htmlcov/index.html)
 
-*Zero-compromise configuration management for Python applications*
+*Zero-dependency configuration management for Python applications*
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples](#-examples) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Development Status](#-development-status) • [Contributing](#-contributing)
 
 </div>
 
@@ -91,16 +92,67 @@ features = config.get_list('features')
 - **Auto-reload** - File watching with callbacks
 - **Thread Safety** - Concurrent access support
 
-</td>---
+</td>
+</tr>
+</table>
+
+---
+
+## 🚧 **Development Status**
+
+**Current Version:** 0.1.0 (Alpha/Beta)  
+**Overall Test Coverage:** ~28% (Target: 95%)
+
+### Production-Ready Components ✅
+- **JSON Source** - 83.91% coverage, 30 comprehensive tests
+- **YAML Source** - 83.80% coverage, 30 comprehensive tests
+- **Environment Source** - 93.99% coverage, 20 comprehensive tests
+- **INI Source** - 97.01% coverage, 33 comprehensive tests
+- **Validation Engine** - 85.06% coverage, 87 comprehensive tests
+- **Cache System** - 80.29% coverage, 76 comprehensive tests
+- **Deep merge system** - Properly merges nested dictionaries
+- **Type-safe getters** - get_int(), get_bool(), get_float(), get_list()
+
+### In Development ⚠️
+- **ConfigManager Core** - 57.62% coverage (auto-reload, profiles)
+- **TOML Source** - 35.05% coverage
+- **BaseSource** - 89.47% coverage
+- **Schema System** - 22% coverage (architecture solid, needs integration tests)
+- **Secrets Management** - 15% coverage (architecture solid, needs tests)
+
+### Not Production-Ready ❌
+- **Remote Source** - 19% coverage
+- **Secrets Sources** - 0% coverage
+
+**Quality Standards:**
+- ✅ Zero external dependencies for core functionality
+- ✅ Full mypy type checking compliance
+- ✅ Black + isort code formatting
+- ✅ Comprehensive pytest test suite
+- 🚧 Working toward 95%+ test coverage
+
+---
 
 ## 🚀 **Quick Start**
 
 ### **Installation**
+
 ```bash
-pip install config-manager
+# Core package (zero dependencies)
+pip install configmanagelib
+
+# With YAML support
+pip install configmanagelib[yaml]
+
+# With TOML support (Python < 3.11)
+pip install configmanagelib[toml]
+
+# All optional features
+pip install configmanagelib[all]
 ```
 
 ### **Basic Usage**
+
 ```python
 from config_manager import ConfigManager
 from config_manager.sources import JsonSource, EnvironmentSource
@@ -196,28 +248,27 @@ database_url = config.get('database.url')
 ```
 
 ### **Schema Validation**
+
+⚠️ **Note:** Schema system is in development (22% coverage). See `examples/schema_validation.py` for current usage.
+
 ```python
 from config_manager import ConfigManager
-from config_manager.schema import Schema, Field
+from config_manager.sources import JsonSource
+from config_manager.validation import ValidationEngine, TypeValidator, RangeValidator
 
-# Define configuration schema
-schema = Schema({
-    'server': {
-        'host': Field(str, default='localhost'),
-        'port': Field(int, min_value=1, max_value=65535),
-        'workers': Field(int, min_value=1, default=4)
-    },
-    'database': {
-        'url': Field(str, required=True),
-        'pool_size': Field(int, min_value=1, max_value=100, default=10)
-    }
-})
+# Use validation engine directly for now
+engine = ValidationEngine()
+engine.add_validator('server.port', TypeValidator(int, convert=True))
+engine.add_validator('server.port', RangeValidator(min_value=1, max_value=65535))
 
-config = ConfigManager(schema=schema)
+config = ConfigManager()
 config.add_source(JsonSource('config.json'))
 
-# Automatic validation on access
-server_config = config.get('server')  # ✅ Validated
+# Manual validation
+port = config.get('server.port')
+result = engine.validate_value(port, 'server.port')
+if result.is_valid:
+    print(f"Port {port} is valid")
 ```
 
 ### **Auto-Reload with Callbacks**
@@ -239,93 +290,94 @@ config.on_reload(on_config_change)
 ```
 
 ### **Secrets Management**
+
+⚠️ **Note:** Secrets system is in development (15% coverage). See `examples/secrets_usage.py` for current usage.
+
 ```python
 from config_manager import ConfigManager
 from config_manager.sources import JsonSource
 from config_manager.secrets import SecretsManager, SecretValue
 
-# Set up secrets manager
+# Create secrets manager
 secrets = SecretsManager()
-secrets.add_secret('db_password', SecretValue('super_secret_password'))
+secrets.set_secret('db_password', 'super_secret_password')
 
-config = ConfigManager(secrets_manager=secrets)
-config.add_source(JsonSource('config.json'))
-
-# Access secrets securely (masked in logs/displays)
-db_password = config.get('database.password')  # Retrieved from secrets
+# Access secrets (masked in logs)
+password = secrets.get_secret('db_password')
+if password:
+    print(password.get_value())  # Actual value
+    print(password)               # Prints: [MASKED_SECRET]
 ```
 
 ### **Environment Profiles**
+
+⚠️ **Note:** Profile system is in ConfigManager core (57.62% coverage). See `examples/profiles_usage.py` for current usage.
+
 ```python
 from config_manager import ConfigManager
-from config_manager.sources import JsonSource
+from config_manager.sources import JsonSource, EnvironmentSource
+from config_manager.profiles import ProfileManager, ConfigProfile
 
-# Automatic environment detection
-config = ConfigManager(profile='production')  # or 'development', 'testing'
+# Create profile manager
+manager = ProfileManager()
 
-# Load environment-specific configuration
-config.add_source(JsonSource(f'config-{config.profile}.json'))
-config.add_source(JsonSource('config.json'))  # Fallback
+# Define profiles
+dev_profile = ConfigProfile('development')
+dev_profile.add_source(JsonSource('config-dev.json'))
 
-# Profile-aware configuration access
-is_production = config.profile == 'production'
+prod_profile = ConfigProfile('production')
+prod_profile.add_source(JsonSource('config-prod.json'))
+
+manager.add_profile(dev_profile)
+manager.add_profile(prod_profile)
+manager.set_active_profile('production')
+
+# Load profile-specific config
+profile = manager.get_active_profile()
+for source in profile.sources:
+    config = ConfigManager()
+    config.add_source(source)
 ```
 
 ---
 
-## 🧪 **Testing Support**
+## 🧪 **Testing**
 
-ConfigManager includes comprehensive testing utilities for your applications:
+ConfigManager has comprehensive test coverage for production-ready components:
 
-```python
-import pytest
-from config_manager.testing import ConfigManagerTestCase, temp_config
+- **332+ passing tests** across all modules
+- **Coverage by component**:
+  - INI Source: 97.01%
+  - Environment Source: 93.99%
+  - BaseSource: 89.47%
+  - Validation Engine: 85.06%
+  - JSON Source: 83.91%
+  - YAML Source: 83.80%
+  - Cache System: 80.29%
+- **Overall coverage**: ~28% (working toward 95% target)
 
-class TestMyApp(ConfigManagerTestCase):
-    def test_app_configuration(self):
-        with temp_config({'debug': True, 'port': 9999}) as config:
-            app = MyApp(config)
-            assert app.debug_mode is True
-            assert app.port == 9999
+Run tests with pytest:
 
-# Pytest fixtures
-@pytest.fixture
-def test_config():
-    return temp_config({
-        'database': {'url': 'sqlite:///:memory:'},
-        'debug': True
-    })
+```bash
+# All tests with coverage
+pytest --cov=config_manager
 
-def test_database_connection(test_config):
-    with test_config as config:
-        db = Database(config.get('database.url'))
-        assert db.connect()
+# Specific component tests
+pytest tests/test_ini_source.py -v
+pytest tests/test_validation.py -v
+
+# Fast unit tests only
+pytest -m unit
 ```
 
 ---
 
 ## 📊 **Performance**
 
-ConfigManager is built for performance-critical applications:
+ConfigManager uses intelligent caching for high-performance configuration access:
 
-```python
-# Benchmark: 1M configuration accesses
-import time
-from config_manager import ConfigManager
-
-config = ConfigManager(enable_caching=True)
-config.add_source(JsonSource('large-config.json'))
-
-start = time.time()
-for i in range(1_000_000):
-    value = config.get(f'section.key_{i % 1000}')
-end = time.time()
-
-print(f"1M accesses: {end - start:.2f}s")  # ~0.05s with caching
-```
-
-**Performance Features:**
-- ⚡ **Intelligent Caching** - Configurable multi-level caching
+**Caching Features:**
+- ⚡ **Multi-level caching** - Memory and file-based backends
 - 🔄 **Lazy Loading** - Sources loaded on-demand
 - 📈 **Memory Efficient** - Minimal memory footprint
 - 🎯 **Fast Access** - O(1) cached configuration access
@@ -369,24 +421,32 @@ graph TB
 
 ## 📚 **Documentation**
 
-### **API Reference**
-- [ConfigManager API](docs/api/config-manager.md) - Core configuration management
-- [Sources](docs/api/sources.md) - Configuration source implementations
-- [Schema Validation](docs/api/schema.md) - Data validation and constraints
-- [Caching](docs/api/caching.md) - Performance optimization
-- [Secrets](docs/api/secrets.md) - Secure credential management
+### **Implementation Guides**
+- [YAML Implementation](docs/YAML_IMPLEMENTATION.md) - YAML source details
+- [INI Implementation](docs/INI_IMPLEMENTATION.md) - INI source details
+- [Caching System](docs/CACHING.md) - Cache backend architecture
+- [Caching Implementation](docs/CACHING_IMPLEMENTATION.md) - Cache implementation details
+- [Schema Validation](docs/SCHEMA_VALIDATION.md) - Validation system design
+- [Secrets Management](docs/SECRETS_MANAGEMENT.md) - Secrets architecture
 
-### **Guides**
-- [Getting Started](docs/guides/getting-started.md) - Comprehensive tutorial
-- [Best Practices](docs/guides/best-practices.md) - Production deployment tips
-- [Migration Guide](docs/guides/migration.md) - Migrating from other libraries
-- [Testing](docs/guides/testing.md) - Testing applications with ConfigManager
+### **Development Documentation**
+- [Contributing Guide](docs/dev/CONTRIBUTING.md) - How to contribute
+- [Priority Improvements](docs/dev/PRIORITY_IMPROVEMENTS.md) - Development roadmap
+- [Changelog](docs/dev/CHANGELOG.md) - Version history
+- [Test Coverage Report](docs/dev/TEST_COVERAGE_COMPLETE.md) - Testing status
 
-### **Examples**
-- [Web Applications](examples/web-app/) - Flask/Django integration
-- [Microservices](examples/microservice/) - Docker + Kubernetes deployment
-- [Desktop Applications](examples/desktop/) - GUI application configuration
-- [Data Processing](examples/data-pipeline/) - ETL pipeline configuration
+### **Example Scripts**
+- [Basic Usage](examples/basic_usage.py) - Getting started
+- [Advanced Usage](examples/advanced_usage.py) - Complex configurations
+- [YAML Usage](examples/yaml_usage.py) - YAML source examples
+- [INI Usage](examples/ini_usage.py) - INI source examples
+- [TOML Usage](examples/toml_usage.py) - TOML source examples
+- [Auto-Reload](examples/auto_reload_usage.py) - File watching
+- [Cache Performance](examples/cache_performance.py) - Caching demos
+- [Profiles](examples/profiles_usage.py) - Environment profiles
+- [Secrets](examples/secrets_usage.py) - Secrets management
+- [Schema Validation](examples/schema_validation.py) - Validation examples
+- [Remote Source](examples/remote_usage.py) - HTTP/HTTPS configs
 
 ---
 
@@ -396,35 +456,34 @@ ConfigManager uses modern Python development practices:
 
 ```bash
 # Development setup
-git clone https://github.com/yourusername/ConfigManager.git
-cd ConfigManager
+git clone https://github.com/sirhCC/ConfigManageLib.git
+cd ConfigManageLib
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+.venv\Scripts\activate  # Windows (PowerShell)
+# source .venv/bin/activate  # Linux/Mac
 pip install -e ".[dev]"
 
 # Run tests
-pytest tests/ -v
+pytest
 
 # Run tests with coverage
-pytest tests/ --cov=config_manager --cov-report=html
+pytest --cov=config_manager --cov-report=html
 
 # Type checking
-mypy config_manager/
+mypy config_manager
 
 # Code formatting
-black config_manager/ tests/
-isort config_manager/ tests/
-
-# All quality checks
-pre-commit run --all-files
+black config_manager tests
+isort config_manager tests
 ```
 
 **Quality Standards:**
-- ✅ **100% Type Coverage** - Full mypy compliance
-- ✅ **95%+ Test Coverage** - Comprehensive test suite
-- ✅ **Zero Lint Errors** - Black, isort, flake8 compliance
-- ✅ **Modern Testing** - pytest with fixtures and parametrization
-- ✅ **CI/CD Pipeline** - GitHub Actions automation
+- ✅ **Full mypy compliance** - Zero type errors enforced
+- ✅ **332+ passing tests** - Comprehensive pytest suite
+- ✅ **Zero lint errors** - Black (88 char), isort, flake8
+- ✅ **Modern testing** - pytest with markers, fixtures, parametrization
+- ✅ **CI/CD pipeline** - GitHub Actions automation
+- 🚧 **Working toward 95% coverage** - Currently at 28%
 
 ---
 
