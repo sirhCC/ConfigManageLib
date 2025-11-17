@@ -475,23 +475,27 @@ class RequiredValidator(Validator):
             result.add_error("Required field is missing (None value)")
             return result
         
-        # Check for custom empty values
-        if value in self.custom_empty_values:
-            result.add_error(f"Value '{value}' is in custom empty values list")
-            return result
-        
         # Check for empty string
         if isinstance(value, str):
             if not self.allow_empty_string and value.strip() == "":
                 result.add_error("Required field cannot be empty string")
                 return result
         
-        # Check for empty collections
+        # Check for empty collections (before custom_empty_values to avoid unhashable type errors)
         elif isinstance(value, (list, dict, tuple, set)):
             if not self.allow_empty_collections and len(value) == 0:
                 collection_type = type(value).__name__
                 result.add_error(f"Required field cannot be empty {collection_type}")
                 return result
+        
+        # Check for custom empty values (only for hashable types)
+        try:
+            if value in self.custom_empty_values:
+                result.add_error(f"Value '{value}' is in custom empty values list")
+                return result
+        except TypeError:
+            # Value is unhashable (list, dict, set), skip this check
+            pass
         
         return result
 
