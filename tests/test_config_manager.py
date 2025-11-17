@@ -51,13 +51,13 @@ class TestConfigManager(unittest.TestCase):
     def test_environment_source(self):
         config = ConfigManager()
         config.add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
-        self.assertEqual(config.get("ENV_KEY"), "env_value")
+        self.assertEqual(config.get("env_key"), "env_value")
 
     def test_override_with_environment_source(self):
         # Create a json file with a key that will be overridden
         override_json_path = "override_config.json"
         with open(override_json_path, 'w') as f:
-            json.dump({"KEY_TO_OVERRIDE": "json_original"}, f)
+            json.dump({"key_to_override": "json_original"}, f)
         
         os.environ["TEST_OVERRIDE_KEY_TO_OVERRIDE"] = "env_override"
 
@@ -65,7 +65,7 @@ class TestConfigManager(unittest.TestCase):
         config.add_source(JsonSource(override_json_path))
         config.add_source(EnvironmentSource(prefix="TEST_OVERRIDE_", nested=False))
 
-        self.assertEqual(config.get("KEY_TO_OVERRIDE"), "env_override")
+        self.assertEqual(config.get("key_to_override"), "env_override")
 
         # Clean up
         os.remove(override_json_path)
@@ -120,8 +120,8 @@ class TestConfigManager(unittest.TestCase):
         
         # Test from environment variable
         config.add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
-        self.assertEqual(config.get_int("INT_ENV"), 123)
-        self.assertTrue(config.get_bool("BOOL_ENV"))
+        self.assertEqual(config.get_int("int_env"), 123)
+        self.assertTrue(config.get_bool("bool_env"))
     
     def test_list_conversion(self):
         config = ConfigManager()
@@ -154,7 +154,7 @@ class TestConfigManager(unittest.TestCase):
         # Test actual chaining
         config = ConfigManager()
         config.add_source(JsonSource(self.test_json_path)).add_source(EnvironmentSource(prefix="TEST_PREFIX_", nested=False))
-        self.assertEqual(config.get("ENV_KEY"), "env_value")
+        self.assertEqual(config.get("env_key"), "env_value")
         self.assertEqual(config.get("JSON_KEY"), "json_value")
     
     def test_reload(self):

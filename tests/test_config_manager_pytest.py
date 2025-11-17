@@ -80,7 +80,6 @@ class TestConfigManagerCore(BaseConfigManagerTest):
             # Cleanup
             os.unlink(temp_path)
     
-    @pytest.mark.skip(reason="Environment variable key matching issue - needs investigation")
     def test_config_manager_with_environment_source(self):
         """Test ConfigManager with environment variable source."""
         # Setup environment variables directly (all uppercase)
@@ -104,7 +103,6 @@ class TestConfigManagerCore(BaseConfigManagerTest):
                 if key in os.environ:
                     del os.environ[key]
     
-    @pytest.mark.skip(reason="Environment variable key matching issue - needs investigation")
     def test_source_priority_override(self):
         """Test that later sources override earlier ones."""
         # Create JSON test data
@@ -351,7 +349,6 @@ class TestConfigManagerListHandling:
         finally:
             os.unlink(temp_path)
     
-    @pytest.mark.skip(reason="Environment variable key matching issue - needs investigation")
     def test_list_from_environment(self):
         """Test list parsing from environment variables."""
         os.environ['TESTCFG_LIST_VAR'] = 'item1,item2,item3'

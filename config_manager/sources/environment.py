@@ -157,14 +157,17 @@ class EnvironmentSource(BaseSource):
         # Parse the value
         parsed_value = self._parse_env_value(env_value) if self._parse_values else env_value
         
-        # Handle nested structure
-        if self._nested and '_' in config_key:
-            self._set_nested_value(config, config_key, parsed_value)
-        else:
-            config[config_key] = parsed_value
+        # Normalize key to lowercase for consistent access
+        normalized_key = config_key.lower()
         
-        self._logger.debug(f"Processed {env_key} -> {config_key} = {parsed_value}")
-        return config_key
+        # Handle nested structure
+        if self._nested and '_' in normalized_key:
+            self._set_nested_value(config, normalized_key, parsed_value)
+        else:
+            config[normalized_key] = parsed_value
+        
+        self._logger.debug(f"Processed {env_key} -> {normalized_key} = {parsed_value}")
+        return normalized_key
 
     def _find_matching_prefix(self, env_key: str) -> Optional[str]:
         """Find the first matching prefix for an environment variable."""
@@ -276,15 +279,16 @@ class EnvironmentSource(BaseSource):
         """
         Set a value in a nested dictionary using underscore notation.
         
-        Converts keys like 'DATABASE_HOST' to nested structure {'database': {'host': value}}
+        Converts keys like 'database_host' to nested structure {'database': {'host': value}}
+        Note: Key should already be normalized to lowercase before calling this method.
         
         Args:
             config_dict: The dictionary to update
-            key: The key with underscores
+            key: The lowercase key with underscores
             value: The value to set
         """
-        # Convert to lowercase for consistent nesting
-        parts = key.lower().split('_')
+        # Split key by underscores (assumes key is already lowercase)
+        parts = key.split('_')
         
         if len(parts) == 1:
             config_dict[key] = value
