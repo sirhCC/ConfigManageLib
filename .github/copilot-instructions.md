@@ -35,8 +35,9 @@ Enterprise-grade Python configuration management library with zero-dependency co
 5. **Added comprehensive YamlSource tests** - 30 tests achieving 83.80% coverage
 6. **Added comprehensive ConfigManager tests** - 33 tests improving coverage from 12.94% to 44.15%
 7. **Added comprehensive TomlSource tests** - 27 tests improving coverage from 8% to 35.05%
-8. **Fixed syntax error** in test_secrets_management.py (f-string backslash issue - line 493)
-9. **Overall comprehensive tests status**: 140/140 tests passing ✅ (Environment + JSON + YAML + ConfigManager + TOML)
+8. **Added advanced ConfigManager tests** - 29 tests for auto-reload, validation, profiles, secrets (44.15% → 57.62%)
+9. **Fixed syntax error** in test_secrets_management.py (f-string backslash issue - line 493)
+10. **Overall comprehensive tests status**: 169/169 tests passing ✅ (Environment + JSON + YAML + TOML + ConfigManager)
 
 ### Quality Metrics:
 - **Overall Coverage**: ~28% (Target: 95%)
@@ -46,10 +47,10 @@ Enterprise-grade Python configuration management library with zero-dependency co
   - YamlSource: 83.80% ✅
   - BaseSource: 89.47% ✅
   - TomlSource: 35.05% ⚠️ (improved from 8%)
-  - ConfigManager: 44.15% ⚠️ (improved from 12.94%)
+  - ConfigManager: 57.62% ⚠️ (improved from 12.94% → 44.15% → 57.62%)
   - Cache: 21.51%
   - Validation: 12.12%
-- **Comprehensive Test Suite**: 140/140 tests passing ✅ (Environment, JSON, YAML, TOML sources + ConfigManager)
+- **Comprehensive Test Suite**: 169/169 tests passing ✅ (Environment, JSON, YAML, TOML sources + ConfigManager core & advanced)
 - **Overall Test Suite**: 250+ passing, 57 failing (other modules), 6 skipped
 - **Known Bugs**: None in tested modules
 
