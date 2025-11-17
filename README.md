@@ -1,466 +1,173 @@
-# ConfigManager
-
-<div align="center">
-
-**Enterprise-Grade Python Configuration Management**
+# ConfigManageLib
 
 [![Python](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Type Checked](https://img.shields.io/badge/type--checked-mypy-blue.svg)](http://mypy-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-pytest-green.svg)](https://pytest.org)
 [![Coverage](https://img.shields.io/badge/coverage-28%25-yellow.svg)](htmlcov/index.html)
 
-*Zero-dependency configuration management for Python applications*
-
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Development Status](#-development-status) • [Contributing](#-contributing)
-
-</div>
+**Zero-dependency Python configuration management with enterprise features**
 
 ---
 
-## 🎯 **Why ConfigManager?**
-
-ConfigManager is the **only** Python configuration library you'll ever need. Built for enterprise applications that demand reliability, performance, and maintainability.
-
-### **The Problem**
-```python
-# 😵 Traditional approach - fragmented and error-prone
-import os
-import json
-import yaml
-
-# Scattered configuration loading
-db_host = os.getenv('DB_HOST', 'localhost')
-with open('config.json') as f:
-    json_config = json.load(f)
-with open('config.yaml') as f:
-    yaml_config = yaml.safe_load(f)
-
-# Manual type conversion and validation
-port = int(os.getenv('PORT', '8080'))
-debug = os.getenv('DEBUG', 'false').lower() == 'true'
-
-# No schema validation, poor error handling
-# No caching, no hot-reload, no secrets management
-```
-
-### **The ConfigManager Solution**
-```python
-# ✨ ConfigManager - unified, typed, and enterprise-ready
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource, YamlSource, EnvironmentSource
-
-config = ConfigManager()
-config.add_source(YamlSource('config.yaml'))
-config.add_source(JsonSource('config.json'))
-config.add_source(EnvironmentSource(prefix='APP_'))
-
-# Type-safe configuration access
-db_host = config.get('database.host', 'localhost')
-port = config.get_int('server.port', 8080)
-debug = config.get_bool('debug', False)
-features = config.get_list('features')
-
-# 🚀 Built-in: validation, caching, hot-reload, secrets, profiles
-```
-
----
-
-## ✨ **Features**
-
-<table>
-<tr>
-<td width="50%">
-
-### **🏗️ Core Features**
-- **Multiple Sources** - JSON, YAML, TOML, Environment, INI
-- **Source Priority** - Elegant override system
-- **Type Safety** - Built-in type conversion & validation
-- **Nested Access** - Deep configuration traversal
-- **Hot Reload** - Real-time configuration updates
-- **Zero Dependencies** - Pure Python implementation
-
-</td>
-<td width="50%">
-
-### **🚀 Enterprise Features**
-- **Caching System** - High-performance configuration access
-- **Schema Validation** - Comprehensive data validation
-- **Secrets Management** - Secure credential handling
-- **Profile Support** - Environment-specific configurations
-- **Auto-reload** - File watching with callbacks
-- **Thread Safety** - Concurrent access support
-
-</td>
-</tr>
-</table>
-
----
-
-## 🚧 **Development Status**
-
-**Current Version:** 0.1.0 (Alpha/Beta)  
-**Overall Test Coverage:** ~28% (Target: 95%)
-
-### Production-Ready Components ✅
-- **JSON Source** - 83.91% coverage, 30 comprehensive tests
-- **YAML Source** - 83.80% coverage, 30 comprehensive tests
-- **Environment Source** - 93.99% coverage, 20 comprehensive tests
-- **INI Source** - 97.01% coverage, 33 comprehensive tests
-- **Validation Engine** - 85.06% coverage, 87 comprehensive tests
-- **Cache System** - 80.29% coverage, 76 comprehensive tests
-- **Deep merge system** - Properly merges nested dictionaries
-- **Type-safe getters** - get_int(), get_bool(), get_float(), get_list()
-
-### In Development ⚠️
-- **ConfigManager Core** - 57.62% coverage (auto-reload, profiles)
-- **TOML Source** - 35.05% coverage
-- **BaseSource** - 89.47% coverage
-- **Schema System** - 22% coverage (architecture solid, needs integration tests)
-- **Secrets Management** - 15% coverage (architecture solid, needs tests)
-
-### Not Production-Ready ❌
-- **Remote Source** - 19% coverage
-- **Secrets Sources** - 0% coverage
-
-**Quality Standards:**
-- ✅ Zero external dependencies for core functionality
-- ✅ Full mypy type checking compliance
-- ✅ Black + isort code formatting
-- ✅ Comprehensive pytest test suite
-- 🚧 Working toward 95%+ test coverage
-
----
-
-## 🚀 **Quick Start**
-
-### **Installation**
+## Installation
 
 ```bash
 # Core package (zero dependencies)
 pip install configmanagelib
 
-# With YAML support
-pip install configmanagelib[yaml]
-
-# With TOML support (Python < 3.11)
-pip install configmanagelib[toml]
-
-# All optional features
-pip install configmanagelib[all]
+# With optional features
+pip install configmanagelib[yaml]  # YAML support
+pip install configmanagelib[toml]  # TOML support (Python < 3.11)
+pip install configmanagelib[all]   # All features
 ```
 
-### **Basic Usage**
+---
+
+## Quick Start
 
 ```python
 from config_manager import ConfigManager
 from config_manager.sources import JsonSource, EnvironmentSource
 
-# Create configuration manager
 config = ConfigManager()
-
-# Add configuration sources (priority: last added = highest)
-config.add_source(JsonSource('app-config.json'))
+config.add_source(JsonSource('config.json'))
 config.add_source(EnvironmentSource(prefix='APP_'))
 
-# Access configuration with type safety
-app_name = config.get('app.name', 'MyApp')
+# Type-safe access
+db_host = config.get('database.host', 'localhost')
 port = config.get_int('server.port', 8080)
 debug = config.get_bool('debug', False)
-features = config.get_list('features', [])
-
-print(f"Starting {app_name} on port {port}")
 ```
-
-### **Configuration Files**
-
-<details>
-<summary><code>app-config.json</code></summary>
-
-```json
-{
-  "app": {
-    "name": "ConfigManager Demo",
-    "version": "1.0.0"
-  },
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080
-  },
-  "database": {
-    "host": "localhost",
-    "port": 5432,
-    "name": "myapp",
-    "pool_size": 10
-  },
-  "features": ["auth", "api", "monitoring"],
-  "debug": false
-}
-```
-</details>
-
-<details>
-<summary><code>config.yaml</code></summary>
-
-```yaml
-app:
-  name: "ConfigManager Demo"
-  version: "1.0.0"
-
-server:
-  host: "0.0.0.0"
-  port: 8080
-
-database:
-  host: "localhost"
-  port: 5432
-  name: "myapp"
-  pool_size: 10
-
-features:
-  - "auth"
-  - "api"
-  - "monitoring"
-
-debug: false
-```
-</details>
 
 ---
 
-## 🔥 **Advanced Examples**
+## Features
 
-### **Multi-Source Configuration with Priority**
+- **Multiple Sources**: JSON, YAML, TOML, INI, Environment variables
+- **Type Safety**: `get_int()`, `get_bool()`, `get_float()`, `get_list()` with automatic conversion
+- **Deep Access**: Nested configuration with dot notation (`database.credentials.password`)
+- **Source Priority**: Later sources override earlier ones (environment overrides files)
+- **Caching**: Memory and file-based caching with LRU/LFU/FIFO eviction
+- **Validation**: Comprehensive validation engine with custom validators
+- **Zero Dependencies**: Core library has no external dependencies
+
+---
+
+## Development Status
+
+**Version:** 0.1.0 (Alpha/Beta)  
+**Overall Coverage:** 28% (Target: 95%)
+
+### Production-Ready (85%+ coverage)
+- ✅ INI Source (97.01%)
+- ✅ Environment Source (93.99%)
+- ✅ BaseSource (89.47%)
+- ✅ Validation Engine (85.06%)
+- ✅ JSON Source (83.91%)
+- ✅ YAML Source (83.80%)
+- ✅ Cache System (80.29%)
+
+### In Development (50-85% coverage)
+- ⚠️ ConfigManager Core (57.62%)
+
+### Not Production-Ready (<50% coverage)
+- ❌ TOML Source (35.05%)
+- ❌ Schema System (22%)
+- ❌ Remote Source (19%)
+- ❌ Secrets Management (15%)
+- ❌ Secrets Sources (0%)
+
+---
+
+## Examples
+
+### Multi-Source Configuration
+
 ```python
 from config_manager import ConfigManager
 from config_manager.sources import YamlSource, JsonSource, EnvironmentSource
 
 config = ConfigManager()
-
-# Add sources in priority order (lowest to highest)
-config.add_source(YamlSource('defaults.yaml'))     # Default values
-config.add_source(JsonSource('config.json'))       # Application config
-config.add_source(EnvironmentSource(prefix='APP_')) # Environment overrides
+config.add_source(YamlSource('defaults.yaml'))     # Base defaults
+config.add_source(JsonSource('config.json'))       # App config
+config.add_source(EnvironmentSource(prefix='APP_'))  # Runtime overrides
 
 # Environment variables override JSON, JSON overrides YAML
-database_url = config.get('database.url')
+db_url = config.get('database.url')
 ```
 
-### **Schema Validation**
-
-⚠️ **Note:** Schema system is in development (22% coverage). See `examples/schema_validation.py` for current usage.
+### Type Conversion
 
 ```python
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource
-from config_manager.validation import ValidationEngine, TypeValidator, RangeValidator
+# Automatic type conversion with defaults
+port = config.get_int('server.port', 8080)
+debug = config.get_bool('debug', False)
+timeout = config.get_float('timeout', 30.0)
+features = config.get_list('features', [])
+```
 
-# Use validation engine directly for now
-engine = ValidationEngine()
-engine.add_validator('server.port', TypeValidator(int, convert=True))
-engine.add_validator('server.port', RangeValidator(min_value=1, max_value=65535))
+### Environment Variables with Nesting
 
+```python
+from config_manager.sources import EnvironmentSource
+
+# Environment: APP_DATABASE_HOST=localhost, APP_DEBUG=true
+source = EnvironmentSource(prefix='APP_', nested=True, parse_values=True)
 config = ConfigManager()
-config.add_source(JsonSource('config.json'))
+config.add_source(source)
 
-# Manual validation
-port = config.get('server.port')
-result = engine.validate_value(port, 'server.port')
-if result.is_valid:
-    print(f"Port {port} is valid")
+# Result: {'database': {'host': 'localhost'}, 'debug': True}
 ```
 
-### **Auto-Reload with Callbacks**
-```python
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource
-
-config = ConfigManager(auto_reload=True, reload_interval=1.0)
-config.add_source(JsonSource('config.json'))
-
-# Register reload callback
-def on_config_change():
-    print("Configuration reloaded!")
-    # Restart services, refresh caches, etc.
-
-config.on_reload(on_config_change)
-
-# Configuration automatically reloads when files change
-```
-
-### **Secrets Management**
-
-⚠️ **Note:** Secrets system is in development (15% coverage). See `examples/secrets_usage.py` for current usage.
+### Caching
 
 ```python
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource
-from config_manager.secrets import SecretsManager, SecretValue
+from config_manager.cache import ConfigCache, EnterpriseMemoryCache
 
-# Create secrets manager
-secrets = SecretsManager()
-secrets.set_secret('db_password', 'super_secret_password')
+cache = ConfigCache(
+    backend=EnterpriseMemoryCache(
+        max_size=100,
+        default_ttl=300.0,
+        eviction_policy='lru'
+    )
+)
 
-# Access secrets (masked in logs)
-password = secrets.get_secret('db_password')
-if password:
-    print(password.get_value())  # Actual value
-    print(password)               # Prints: [MASKED_SECRET]
-```
-
-### **Environment Profiles**
-
-⚠️ **Note:** Profile system is in ConfigManager core (57.62% coverage). See `examples/profiles_usage.py` for current usage.
-
-```python
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource, EnvironmentSource
-from config_manager.profiles import ProfileManager, ConfigProfile
-
-# Create profile manager
-manager = ProfileManager()
-
-# Define profiles
-dev_profile = ConfigProfile('development')
-dev_profile.add_source(JsonSource('config-dev.json'))
-
-prod_profile = ConfigProfile('production')
-prod_profile.add_source(JsonSource('config-prod.json'))
-
-manager.add_profile(dev_profile)
-manager.add_profile(prod_profile)
-manager.set_active_profile('production')
-
-# Load profile-specific config
-profile = manager.get_active_profile()
-for source in profile.sources:
-    config = ConfigManager()
-    config.add_source(source)
+config = ConfigManager(cache=cache)
 ```
 
 ---
 
-## 🧪 **Testing**
+## Documentation
 
-ConfigManager has comprehensive test coverage for production-ready components:
+### Implementation Guides
+- [YAML Implementation](docs/YAML_IMPLEMENTATION.md)
+- [INI Implementation](docs/INI_IMPLEMENTATION.md)
+- [Caching System](docs/CACHING.md)
+- [Schema Validation](docs/SCHEMA_VALIDATION.md)
+- [Secrets Management](docs/SECRETS_MANAGEMENT.md)
 
-- **332+ passing tests** across all modules
-- **Coverage by component**:
-  - INI Source: 97.01%
-  - Environment Source: 93.99%
-  - BaseSource: 89.47%
-  - Validation Engine: 85.06%
-  - JSON Source: 83.91%
-  - YAML Source: 83.80%
-  - Cache System: 80.29%
-- **Overall coverage**: ~28% (working toward 95% target)
+### Development
+- [Contributing Guide](docs/dev/CONTRIBUTING.md)
+- [Priority Improvements](docs/dev/PRIORITY_IMPROVEMENTS.md)
+- [Changelog](docs/dev/CHANGELOG.md)
 
-Run tests with pytest:
+### Examples
+See `examples/` directory for complete working examples:
+- `basic_usage.py` - Getting started
+- `advanced_usage.py` - Complex configurations
+- `yaml_usage.py`, `ini_usage.py`, `toml_usage.py` - Source-specific examples
+- `cache_performance.py` - Caching demonstrations
+- `validation.py` - Validation examples
+
+---
+
+## Development
 
 ```bash
-# All tests with coverage
-pytest --cov=config_manager
-
-# Specific component tests
-pytest tests/test_ini_source.py -v
-pytest tests/test_validation.py -v
-
-# Fast unit tests only
-pytest -m unit
-```
-
----
-
-## 📊 **Performance**
-
-ConfigManager uses intelligent caching for high-performance configuration access:
-
-**Caching Features:**
-- ⚡ **Multi-level caching** - Memory and file-based backends
-- 🔄 **Lazy Loading** - Sources loaded on-demand
-- 📈 **Memory Efficient** - Minimal memory footprint
-- 🎯 **Fast Access** - O(1) cached configuration access
-- 🏃 **Concurrent Safe** - Thread-safe operations
-
----
-
-## 🏗️ **Architecture**
-
-<div align="center">
-
-```mermaid
-graph TB
-    A[ConfigManager] --> B[Source Priority System]
-    B --> C[JSON Source]
-    B --> D[YAML Source]
-    B --> E[Environment Source]
-    B --> F[TOML Source]
-    
-    A --> G[Caching Layer]
-    A --> H[Schema Validation]
-    A --> I[Secrets Management]
-    A --> J[Auto-Reload System]
-    
-    G --> K[Memory Cache]
-    G --> L[File Cache]
-    
-    H --> M[Type Validation]
-    H --> N[Field Constraints]
-    
-    I --> O[Secret Masking]
-    I --> P[Secure Storage]
-    
-    J --> Q[File Watchers]
-    J --> R[Reload Callbacks]
-```
-
-</div>
-
----
-
-## 📚 **Documentation**
-
-### **Implementation Guides**
-- [YAML Implementation](docs/YAML_IMPLEMENTATION.md) - YAML source details
-- [INI Implementation](docs/INI_IMPLEMENTATION.md) - INI source details
-- [Caching System](docs/CACHING.md) - Cache backend architecture
-- [Caching Implementation](docs/CACHING_IMPLEMENTATION.md) - Cache implementation details
-- [Schema Validation](docs/SCHEMA_VALIDATION.md) - Validation system design
-- [Secrets Management](docs/SECRETS_MANAGEMENT.md) - Secrets architecture
-
-### **Development Documentation**
-- [Contributing Guide](docs/dev/CONTRIBUTING.md) - How to contribute
-- [Priority Improvements](docs/dev/PRIORITY_IMPROVEMENTS.md) - Development roadmap
-- [Changelog](docs/dev/CHANGELOG.md) - Version history
-- [Test Coverage Report](docs/dev/TEST_COVERAGE_COMPLETE.md) - Testing status
-
-### **Example Scripts**
-- [Basic Usage](examples/basic_usage.py) - Getting started
-- [Advanced Usage](examples/advanced_usage.py) - Complex configurations
-- [YAML Usage](examples/yaml_usage.py) - YAML source examples
-- [INI Usage](examples/ini_usage.py) - INI source examples
-- [TOML Usage](examples/toml_usage.py) - TOML source examples
-- [Auto-Reload](examples/auto_reload_usage.py) - File watching
-- [Cache Performance](examples/cache_performance.py) - Caching demos
-- [Profiles](examples/profiles_usage.py) - Environment profiles
-- [Secrets](examples/secrets_usage.py) - Secrets management
-- [Schema Validation](examples/schema_validation.py) - Validation examples
-- [Remote Source](examples/remote_usage.py) - HTTP/HTTPS configs
-
----
-
-## 🧪 **Development & Testing**
-
-ConfigManager uses modern Python development practices:
-
-```bash
-# Development setup
+# Clone and setup
 git clone https://github.com/sirhCC/ConfigManageLib.git
 cd ConfigManageLib
 python -m venv .venv
-.venv\Scripts\activate  # Windows (PowerShell)
-# source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate  # Windows
 pip install -e ".[dev]"
 
 # Run tests
@@ -478,733 +185,39 @@ isort config_manager tests
 ```
 
 **Quality Standards:**
-- ✅ **Full mypy compliance** - Zero type errors enforced
-- ✅ **332+ passing tests** - Comprehensive pytest suite
-- ✅ **Zero lint errors** - Black (88 char), isort, flake8
-- ✅ **Modern testing** - pytest with markers, fixtures, parametrization
-- ✅ **CI/CD pipeline** - GitHub Actions automation
-- 🚧 **Working toward 95% coverage** - Currently at 28%
+- ✅ Full mypy compliance (zero type errors)
+- ✅ 332+ passing tests
+- ✅ Black (88 char) + isort formatting
+- ✅ pytest with markers, fixtures, parametrization
+- 🚧 Working toward 95% test coverage
 
 ---
 
-## 🤝 **Contributing**
+## Contributing
 
-We love contributions! ConfigManager is built by the community, for the community.
+Contributions welcome! See [CONTRIBUTING.md](docs/dev/CONTRIBUTING.md) for guidelines.
 
-### **How to Contribute**
-1. 🍴 **Fork** the repository
-2. 🌟 **Create** a feature branch: `git checkout -b feature/amazing-feature`
-3. ✨ **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. 📤 **Push** to the branch: `git push origin feature/amazing-feature`
-5. 🔄 **Open** a Pull Request
-
-### **Contribution Areas**
-- 🐛 **Bug Fixes** - Help us squash bugs
-- ✨ **New Features** - Add new configuration sources or validation rules
-- 📚 **Documentation** - Improve guides, examples, and API docs
-- 🧪 **Testing** - Expand test coverage and add edge cases
-- 🚀 **Performance** - Optimize caching and access patterns
-
-### **Development Guidelines**
-- Follow the [Contributing Guide](CONTRIBUTING.md)
-- Ensure tests pass: `pytest tests/`
-- Maintain type safety: `mypy config_manager/`
-- Follow code style: `black` and `isort`
+**Priority Areas:**
+- Increase test coverage (target: 95%)
+- TOML Source improvements
+- Schema system integration tests
+- Secrets management tests
+- Documentation and examples
 
 ---
 
-## 📜 **License**
+## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 **Acknowledgments**
-
-ConfigManager is inspired by the best configuration management practices from:
-- **Django Settings** - Elegant configuration patterns
-- **Spring Boot** - Profile-based configuration
-- **Kubernetes ConfigMaps** - Cloud-native configuration management
-- **HashiCorp Vault** - Secrets management best practices
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-<div align="center">
-
-**Made with ❤️ by the ConfigManager Team**
-
-[⭐ Star us on GitHub](https://github.com/yourusername/ConfigManager) • [🐛 Report Issues](https://github.com/yourusername/ConfigManager/issues) • [💬 Join Discussions](https://github.com/yourusername/ConfigManager/discussions)
-
-</div>
-
-### JSON Source
-
-Load configuration from a JSON file:
-
-```python
-from config_manager.sources import JsonSource
-
-config.add_source(JsonSource('config.json'))
-```
-
-### Environment Variables
-
-Load configuration from environment variables:
-
-```python
-from config_manager.sources import EnvironmentSource
-
-# Load all environment variables with the APP_ prefix
-# For example, APP_DATABASE_HOST will be available as DATABASE_HOST
-config.add_source(EnvironmentSource(prefix='APP_'))
-```
-
-### Remote Configuration Source
-
-Load configuration from remote HTTP/HTTPS endpoints for centralized configuration management:
-
-```python
-from config_manager.sources import RemoteSource, remote_source
-
-# Basic usage
-config.add_source(RemoteSource('https://config.example.com/api/config'))
-
-# Using the fluent builder API with authentication
-source = remote_source('https://config.example.com/api/config') \
-    .with_bearer_token('your-token-here') \
-    .with_header('X-Client-Version', '1.0.0') \
-    .with_timeout(30.0) \
-    .build()
-
-config.add_source(source)
-```
-
-**Authentication Support**: Multiple authentication methods are supported:
-
-```python
-# Bearer Token Authentication
-source = remote_source(url).with_bearer_token('token123').build()
-
-# API Key Authentication
-source = remote_source(url).with_api_key('key123', 'X-API-Key').build()
-
-# Basic Authentication
-source = remote_source(url).with_basic_auth('user', 'pass').build()
-
-# Custom Headers
-source = remote_source(url) \
-    .with_header('Authorization', 'Custom auth-scheme') \
-    .with_header('X-Service', 'ConfigManager') \
-    .build()
-```
-
-**Configuration Options**:
-
-```python
-source = remote_source('https://config.example.com/config.json') \
-    .with_timeout(30.0) \           # Request timeout in seconds
-    .with_ssl_verify(True) \        # SSL certificate verification
-    .with_user_agent('MyApp/1.0') \ # Custom User-Agent header
-    .build()
-```
-
-**Perfect for Cloud-Native Applications**: Ideal for microservices, containerized applications, and cloud deployments where configuration needs to be centralized and dynamically updated.
-
-```python
-# Environment-specific configuration
-env = os.getenv('ENVIRONMENT', 'production')
-config_url = f'https://config-service.example.com/api/config/{env}'
-
-config = ConfigManager()
-config.add_source(remote_source(config_url)
-    .with_bearer_token(os.getenv('CONFIG_TOKEN'))
-    .with_timeout(10.0)
-    .build())
-```
-
-## Advanced Usage
-
-### Configuration Profiles & Environments
-
-ConfigManager supports environment-specific configuration profiles, allowing you to manage different settings for development, testing, staging, and production environments.
-
-#### Basic Profile Usage
-
-```python
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource
-
-# Create ConfigManager with explicit profile
-config = ConfigManager(profile='development')
-
-# Or enable automatic environment detection
-config = ConfigManager(auto_detect_profile=True)  # Detects from ENV, NODE_ENV, etc.
-
-# Check current profile
-print(f"Current profile: {config.get_current_profile()}")
-
-# List available profiles
-print(f"Available profiles: {config.list_profiles()}")
-```
-
-#### Default Profiles
-
-ConfigManager comes with predefined profiles:
-
-- **base**: Base configuration (inherited by others)
-- **development**: Debug enabled, verbose logging
-- **testing**: Minimal logging, analytics disabled  
-- **staging**: Production-like with some debug features
-- **production**: Optimized for production, SSL required
-
-Each profile has default variables:
-
-```python
-# Access profile-specific variables
-debug_mode = config.get_profile_var('debug')          # True for development
-log_level = config.get_profile_var('log_level')       # 'DEBUG' for development
-ssl_required = config.get_profile_var('ssl_required') # True for production only
-```
-
-#### Environment Detection
-
-ConfigManager automatically detects the environment from these variables (in order of precedence):
-
-- `ENVIRONMENT`
-- `ENV` 
-- `NODE_ENV`
-- `PYTHON_ENV`
-- `CONFIG_ENV`
-- `APP_ENV`
-
-It also recognizes common aliases:
-- `dev`, `develop`, `local` → `development`
-- `test` → `testing`
-- `stage` → `staging`
-- `prod` → `production`
-
-```python
-import os
-
-# Set environment
-os.environ['ENV'] = 'production'
-
-# ConfigManager will automatically use production profile
-config = ConfigManager(auto_detect_profile=True)
-print(config.get_current_profile())  # 'production'
-```
-
-#### Profile-Specific Configuration Files
-
-Use `add_profile_source()` to load environment-specific configuration files:
-
-```python
-# Directory structure:
-# config/
-#   ├── base.json           # Base configuration
-#   ├── development.json    # Development overrides
-#   ├── testing.json        # Testing overrides  
-#   └── production.json     # Production overrides
-
-config = ConfigManager(profile='development')
-
-# Load base configuration
-config.add_source(JsonSource('config/base.json'))
-
-# Load profile-specific configuration
-config.add_profile_source('config')  # Loads config/development.json
-
-# The method automatically creates the correct path based on current profile
-```
-
-#### Profile Path Utilities
-
-ConfigManager provides utilities for working with profile-specific paths:
-
-```python
-from config_manager.profiles import create_profile_source_path, profile_source_exists
-
-# Create profile-specific paths
-dev_path = create_profile_source_path('config', 'development')
-# Returns: 'config/development.json'
-
-prod_path = create_profile_source_path('app.yaml', 'production') 
-# Returns: 'app.production.yaml'
-
-# Check if profile-specific files exist
-if profile_source_exists('config', 'development'):
-    print("Development config exists")
-```
-
-#### Custom Profiles
-
-Create custom profiles for specific use cases:
-
-```python
-# Create a custom profile inheriting from production
-custom_profile = config.create_profile('demo', base_profile='production')
-
-# Set custom variables
-custom_profile.set_var('feature_flags', {
-    'new_ui': True,
-    'beta_features': True
-})
-custom_profile.set_var('api_timeout', 30)
-
-# Switch to custom profile
-config.set_profile('demo')
-
-# Access custom variables
-features = config.get_profile_var('feature_flags')
-timeout = config.get_profile_var('api_timeout')
-```
-
-#### Profile Switching
-
-Switch between profiles at runtime:
-
-```python
-# Start with development
-config = ConfigManager(profile='development')
-config.add_source(JsonSource('app.json'))
-
-print(f"Debug mode: {config.get_profile_var('debug')}")  # True
-
-# Switch to production
-config.set_profile('production')
-config.reload()  # Reload configuration with new profile
-
-print(f"Debug mode: {config.get_profile_var('debug')}")  # False
-print(f"SSL required: {config.get_profile_var('ssl_required')}")  # True
-```
-
-#### Complete Profile Example
-
-```python
-import os
-from config_manager import ConfigManager
-from config_manager.sources import JsonSource, EnvironmentSource
-
-# Set up directory structure with profile-specific configs
-# config/
-#   ├── app.json              # Base application config
-#   ├── development.json      # Dev-specific settings
-#   └── production.json       # Prod-specific settings
-
-# Auto-detect environment (development, staging, production, etc.)
-config = ConfigManager(auto_detect_profile=True)
-
-# Add base configuration
-config.add_source(JsonSource('config/app.json'))
-
-# Add profile-specific configuration (automatically loads correct file)
-config.add_profile_source('config')
-
-# Add environment variables (profile-aware)
-config.add_source(EnvironmentSource(prefix='APP_'))
-
-# Access configuration
-app_name = config.get('app.name')
-database_url = config.get('database.url')
-
-# Access profile-specific variables
-debug = config.get_profile_var('debug')
-log_level = config.get_profile_var('log_level')
-
-print(f"Running {app_name} in {config.get_current_profile()} mode")
-print(f"Debug: {debug}, Log Level: {log_level}")
-```
-
-For complete examples, see [examples/profiles_usage.py](examples/profiles_usage.py).
-
-### Schema Validation
-
-Define schemas to validate configuration structure, types, and values:
-
-```python
-from config_manager import ConfigManager
-from config_manager.schema import Schema, String, Integer, Boolean
-from config_manager.validation import RangeValidator, ChoicesValidator
-
-# Define a schema
-schema = Schema({
-    "app_name": String(required=True),
-    "port": Integer(default=8080, validators=[RangeValidator(min_value=1024, max_value=65535)]),
-    "debug": Boolean(default=False),
-    "log_level": String(default="INFO", validators=[ChoicesValidator(["DEBUG", "INFO", "WARNING", "ERROR"])])
-})
-
-# Create ConfigManager with schema
-config = ConfigManager(schema=schema)
-config.add_source(JsonSource('config.json'))
-
-# Validate configuration
-try:
-    validated_config = config.validate()
-    print(f"App: {validated_config['app_name']}")
-    print(f"Port: {validated_config['port']}")  # Automatically converted to int
-except ValidationError as e:
-    print(f"Configuration error: {e}")
-
-# Check if configuration is valid
-if config.is_valid():
-    print("✅ Configuration is valid!")
-else:
-    errors = config.get_validation_errors()
-    for error in errors:
-        print(f"❌ {error}")
-```
-
-For detailed schema validation documentation, see [SCHEMA_VALIDATION.md](SCHEMA_VALIDATION.md).
-
-### Multi-Source Configuration with TOML
-
-Combine multiple configuration sources with TOML as the base configuration:
-
-```python
-from config_manager import ConfigManager
-from config_manager.sources import TomlSource, JsonSource, EnvironmentSource
-
-# Create configuration manager
-config = ConfigManager()
-
-# Base configuration from TOML
-config.add_source(TomlSource('app.toml'))
-
-# Environment-specific overrides from JSON
-config.add_source(JsonSource('config/production.json'))
-
-# Runtime overrides from environment variables
-config.add_source(EnvironmentSource(prefix='APP_'))
-
-# TOML configuration takes precedence order into account
-# Environment variables > JSON > TOML
-app_name = config.get('app.name')
-database_url = config.get('database.url')
-```
-
-Example `app.toml`:
-```toml
-[app]
-name = "MyApp"
-version = "1.0.0"
-debug = false
-
-[database]
-url = "sqlite:///app.db"
-pool_size = 5
-
-[features]
-authentication = true
-api = true
-web_ui = false
-```
-
-### Multi-Source Configuration with INI
-
-Use INI files as base configuration with other source overrides:
-
-```python
-from config_manager import ConfigManager
-from config_manager.sources import IniSource, JsonSource, EnvironmentSource
-
-# Create configuration manager
-config = ConfigManager()
-
-# Base configuration from INI/CFG
-config.add_source(IniSource('app.ini'))
-
-# Environment-specific overrides from JSON
-config.add_source(JsonSource('config/production.json'))
-
-# Runtime overrides from environment variables
-config.add_source(EnvironmentSource(prefix='APP_'))
-
-# INI configuration with precedence order
-# Environment variables > JSON > INI
-server_port = config.get_int('server.port')
-db_host = config.get('database.host')
-```
-
-### Nested Configuration
-
-Access nested configuration values using dot notation:
-
-```python
-# Given a JSON structure like:
-# {
-#   "database": {
-#     "host": "localhost",
-#     "port": 5432,
-#     "credentials": {
-#       "username": "admin"
-#     }
-#   }
-# }
-
-host = config.get('database.host')  # 'localhost'
-username = config.get('database.credentials.username')  # 'admin'
-```
-
-### Type Conversion
-
-Convert configuration values to specific types:
-
-```python
-port = config.get_int('database.port', 5432)  # Returns an int
-timeout = config.get_float('api.timeout', 30.0)  # Returns a float
-debug = config.get_bool('app.debug', False)  # Returns a boolean
-allowed_hosts = config.get_list('security.allowed_hosts', ['localhost'])  # Returns a list
-```
-
-### Reloading Configuration
-
-Reload configuration from all sources:
-
-```python
-# When configuration sources change (e.g., updated JSON files)
-config.reload()
-```
-
-### Configuration File Watching & Auto-Reload
-
-Automatically reload configuration when files change, enabling zero-downtime configuration updates:
-
-```python
-# Enable auto-reload for file-based sources
-config = ConfigManager(auto_reload=True)
-config.add_source(JsonSource('app.json'))
-config.add_source(YamlSource('config.yaml'))
-
-# Configuration will automatically reload when files change
-# No manual intervention required!
-```
-
-**Callback Support**: Register functions to be called when configuration reloads:
-
-```python
-def on_config_change():
-    print("Configuration updated! Refreshing application state...")
-    # Update application state based on new configuration
-    update_database_pool_size(config.get_int('database.pool_size'))
-    update_log_level(config.get('logging.level'))
-
-# Register callback
-config = ConfigManager(auto_reload=True, reload_interval=1.0)
-config.add_source(JsonSource('app.json'))
-config.on_reload(on_config_change)
-```
-
-**Configuration Options**:
-
-```python
-# Customize auto-reload behavior
-config = ConfigManager(
-    auto_reload=True,           # Enable auto-reload
-    reload_interval=0.5         # Check for changes every 0.5 seconds
-)
-
-# Multiple callbacks are supported
-config.on_reload(update_cache_settings)
-config.on_reload(refresh_feature_flags)
-config.on_reload(log_config_change)
-
-# Remove callbacks when no longer needed
-config.remove_reload_callback(update_cache_settings)
-```
-
-**File Watching Technology**: Auto-reload uses the `watchdog` library for efficient file monitoring when available, with automatic fallback to polling for maximum compatibility.
-
-**Production Benefits**:
-- **Zero-downtime updates**: Change configuration without restarting applications
-- **Feature flag updates**: Enable/disable features in real-time
-- **Scaling adjustments**: Modify connection pools, timeouts, and limits dynamically
-- **Environment transitions**: Switch between configurations seamlessly
-
-**Installation for Optimal Performance**:
-```bash
-pip install watchdog  # Optional: For better file watching performance
-```
-
-## 🚀 Performance & Testing
-
-### ⚡ **Benchmark Results**
-
-```python
-# Run performance benchmarks
-from examples.cache_performance import run_benchmarks
-
-monitor = run_benchmarks()
-print(f"🏃‍♂️ Concurrent access: {monitor.operations_per_second:,.0f} ops/sec")
-print(f"⚡ Cache retrieval: {monitor.avg_retrieval_time:.2f}ms")
-print(f"💾 Memory usage: {monitor.memory_usage_mb:.1f}MB")
-
-# Typical performance metrics:
-# • 3,000+ operations/second concurrent access
-# • Sub-millisecond cache retrieval times
-# • ~5MB memory footprint for 10,000 config keys
-```
-
-### 🧪 **Comprehensive Testing & Verification**
-
-All enterprise systems have been thoroughly tested and verified:
-
-```bash
-# Core system verification
-python tests/test_final_verification.py        # ✅ All 8 core systems verified
-python tests/test_cache_enterprise.py          # ✅ Enterprise cache features  
-python tests/test_validation.py                # ✅ Modern validation system
-python tests/test_secrets_simple.py            # ✅ Secrets management
-python tests/test_cache_integration.py         # ✅ Cache-ConfigManager integration
-python comprehensive_test.py                   # ✅ Full system integration
-
-# Run the full test suite
-python -m pytest tests/ -v --ignore=tests/test_simple_yaml.py
-```
-
-**✅ Testing Results:**
-- All core enterprise systems: **PASSED**
-- Zero lint errors across core components
-- Comprehensive integration testing completed
-- Performance benchmarks verified
-- Thread-safety and concurrency tested
-- Backward compatibility maintained
-
-### 📊 **Enterprise Test Coverage**
-
-| Component | Coverage | Features Tested |
-|-----------|----------|----------------|
-| **🔍 Validation Engine** | 100% | TypeValidator, CompositeValidator, ValidationContext/Result |
-| **📋 Schema System** | 100% | Schema, SchemaField, field factories, validation integration |
-| **⚡ Enterprise Cache** | 100% | EnterpriseMemoryCache, CacheManager, statistics, health monitoring |
-| **🔐 Secrets Management** | 100% | SecretValue, SecretsManager, masking, encryption support |
-| **🏗️ ConfigManager Integration** | 100% | Seamless integration, backward compatibility, performance |
-
-## 🛠️ Development
-
-### 📦 **Building from Source**
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/ConfigManageLib.git
-cd ConfigManageLib
-
-# Set up development environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install in development mode
-pip install -e ".[dev]"
-
-# Run tests
-python -m pytest tests/ -v
-```
-
-### 🔧 **Development Tools**
-
-```bash
-# Code quality checks
-black config_manager/                    # Code formatting
-flake8 config_manager/                   # Linting
-mypy config_manager/                     # Type checking
-pytest tests/ --cov=config_manager       # Test coverage
-```
-
-## 📋 API Reference
-
-### 🎯 **Enterprise Core Classes**
-
-```python
-# Core configuration management
-from config_manager import ConfigManager
-
-# Modern schema and validation
-from config_manager.schema import Schema, String, Integer, Boolean, Float
-from config_manager.validation import (
-    ValidationEngine, TypeValidator, RequiredValidator, 
-    RangeValidator, EmailValidator, CompositeValidator
-)
-
-# Enterprise caching system
-from config_manager.cache import (
-    EnterpriseMemoryCache, CacheManager, 
-    EnterpriseFileCache, NullCache
-)
-
-# Comprehensive secrets management
-from config_manager.secrets import (
-    SecretsManager, LocalEncryptedSecrets, 
-    HashiCorpVaultSecrets, AzureKeyVaultSecrets,
-    mask_sensitive_config
-)
-
-# Configuration sources
-from config_manager.sources import (
-    JsonSource, YamlSource, TomlSource, IniSource,
-    EnvironmentSource, RemoteSource
-)
-```
-
-### 📚 **Enterprise Quick Reference**
-
-```python
-# ConfigManager - Main entry point with enterprise features
-config = ConfigManager(
-    schema=schema,           # Schema validation
-    auto_reload=True,        # Hot-reload support
-    cache_enabled=True,      # Enterprise caching
-    profile='production'     # Environment profile
-)
-
-# Schema System - Type-safe configuration
-schema = Schema({
-    "database": Schema({
-        "host": String(required=True),
-        "port": Integer(validators=[RangeValidator(1024, 65535)])
-    })
-})
-
-# Enterprise Cache - Multi-backend with statistics
-cache = EnterpriseMemoryCache(max_size=1000, default_ttl=3600)
-cache.set("key", "value", tags={"production", "cache"})
-stats = cache.get_stats()
-
-# Secrets Management - Multi-provider with encryption
-secrets = SecretsManager()
-secrets.add_provider("local", LocalEncryptedSecrets())
-secrets.set_secret("api_key", "secret_value")
-
-# Validation Engine - Comprehensive validation framework
-engine = ValidationEngine()
-validator = CompositeValidator([RequiredValidator(), EmailValidator()])
-result = validator.validate("user@domain.com", ValidationContext())
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### 🎯 **Areas for Contribution**
-
-- 🔌 **New Sources**: Add support for more configuration formats
-- 🛡️ **Security**: Enhance encryption and secrets management
-- 🚀 **Performance**: Optimize caching and parsing
-- 📚 **Documentation**: Improve examples and guides
-- 🧪 **Testing**: Add more test cases and scenarios
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-- 📖 **Documentation**: Full guides in the `docs/` directory
-- 💬 **Issues**: Report bugs on [GitHub Issues](https://github.com/your-org/ConfigManageLib/issues)
+## Links
+
+- **Repository**: https://github.com/sirhCC/ConfigManageLib
+- **Issues**: https://github.com/sirhCC/ConfigManageLib/issues
+- **PyPI**: `pip install configmanagelib`
 
 ---
 
-<div align="center">
-
-**⭐ Star us on GitHub if ConfigManageLib helped your project! ⭐**
-
-</div>
+**Made with ❤️ for Python developers who need reliable configuration management**
