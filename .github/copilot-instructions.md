@@ -1,91 +1,71 @@
-# ConfigManager AI Coding Guidelines
+# ConfigManager Development Guidelines
 
 Enterprise-grade Python configuration management library with zero-dependency core and comprehensive validation/caching/secrets systems.
 
-## ⚠️ Project Status (Updated: November 16, 2025)
+## Overview
 
-**Current Maturity Level:** Alpha/Beta - Active Development
+This library implements a source-priority configuration system where later sources override earlier ones via deep merge (not replacement). All operations are thread-safe using RLock patterns.
 
-### What's Working (Production-Ready):
-- ✅ **Core ConfigManager**: Thread-safe operations, source priority system
-- ✅ **JSON Source**: 83.91% coverage, 30 comprehensive tests, production-ready
-- ✅ **Environment Source**: 93.99% coverage, 20 comprehensive tests, **FIXED** empty prefix bug
-- ✅ **YAML Source**: 83.80% coverage, 30 comprehensive tests, production-ready
-- ✅ **Validation Engine**: 85.06% coverage, 87 comprehensive tests, **FIXED** RequiredValidator unhashable bug
-- ✅ **Deep merge system**: Properly merges nested dictionaries
-- ✅ **Type-safe getters**: get_int(), get_bool(), get_float(), get_list()
-- ✅ **BaseSource protocol**: Clean abstraction for all sources
+**Key Architecture**:
+- `ConfigManager`: Main orchestrator with thread-safe operations
+- `BaseSource` + `ConfigSource` Protocol: All sources inherit from `config_manager/sources/base.py`
+- `ValidationEngine`: Dataclass-first validation with immutable contexts
+- `ConfigCache`: Backend-agnostic caching (Memory/File/Null) with TTL/LRU eviction
+- `SecretsManager`: Provider pattern for encrypted secrets (Local/Vault/Azure)
+- `ProfileManager`: Environment-specific configs with inheritance
 
-### What Needs Work (Do Not Use in Production):
-- ✅ **Cache System**: 80.29% coverage - **IMPROVED** from 21.51%, 76 comprehensive tests, all eviction policies working
-- ✅ **INI Source**: 97.01% coverage - **IMPROVED** from 13.43%, 33 comprehensive tests, production-ready
-- ⚠️ **Secrets Management**: 15% coverage - architecture solid, needs comprehensive tests
-- ⚠️ **Schema System**: 22% coverage - dataclass design good, validation integration incomplete
-- ❌ **Secrets Sources**: 0% coverage - not production-ready
-- ❌ **Remote Source**: 19% coverage - minimal testing
-- ⚠️ **TOML Source**: 35.05% coverage (improved from 8%) - 27 comprehensive tests added
+## Coding Standards
 
-### Recent Fixes (Nov 16, 2025 - Session 3):
-1. **Added comprehensive Cache tests** - 76 tests improving coverage from 21.51% to 80.29%
-2. **Added comprehensive INI Source tests** - 33 tests improving coverage from 13.43% to 97.01%
-3. **Fixed all failing INI tests** - recreated file with proper Windows file cleanup (try/finally)
-4. **Added Dependabot configuration** - weekly updates for pip and github-actions
-5. **Updated README.md** - complete rewrite (1211 → 213 lines, 82% reduction), accurate status, fixed all outdated info
-6. **Added comprehensive ConfigManager tests** - 94 new tests improving coverage from 42.73% to 64.54% (+21.81%)
-   - Auto-reload functionality (57 tests)
-   - Profile management (10 tests)
-   - Secrets integration (7 tests)
-   - Cache integration (8 tests)
-   - Thread safety (5 tests)
-   - Edge cases and utilities (7 tests)
+### Method and Class Naming
+- **Private methods**: Prefix with `_` (e.g., `_do_load()`, `_deep_update()`)
+- **Constants**: `UPPER_CASE_WITH_UNDERSCORES`
+- **Classes**: `PascalCase` (e.g., `ConfigManager`, `BaseSource`)
+- **Methods/Functions**: `snake_case` (e.g., `get_int()`, `add_source()`)
 
-### Previous Session Fixes (Nov 16, 2025 - Session 2):
-1. **Fixed EnvironmentSource bugs:**
-   - Empty prefix (`prefixes=[]`) now correctly loads all environment variables
-   - Fixed `if not matched_prefix:` to `if matched_prefix is None:` to handle empty string prefix
-2. **Fixed 3 failing tests** in test_config_manager.py by adding `nested=False` to EnvironmentSource
-3. **Added comprehensive EnvironmentSource tests** - 20 tests achieving 93.99% coverage
-4. **Added comprehensive JsonSource tests** - 30 tests achieving 83.91% coverage
-5. **Added comprehensive YamlSource tests** - 30 tests achieving 83.80% coverage
-6. **Added comprehensive ConfigManager tests** - 33 tests improving coverage from 12.94% to 44.15%
-7. **Added comprehensive TomlSource tests** - 27 tests improving coverage from 8% to 35.05%
-8. **Added advanced ConfigManager tests** - 29 tests for auto-reload, validation, profiles, secrets (44.15% → 57.62%)
-9. **Fixed syntax error** in test_secrets_management.py (f-string backslash issue - line 493)
-10. **Added comprehensive ValidationEngine tests** - 87 tests improving coverage from 41.27% to 85.06%
-11. **Fixed RequiredValidator bug** - custom_empty_values check caused unhashable type errors (lists/dicts)
-12. **Overall comprehensive tests status**: 256/256 tests passing ✅ (Environment + JSON + YAML + TOML + ConfigManager + Validation)
+### Method Length and Complexity
+- **Target**: Methods under 25 lines
+- **Extract helpers** when methods exceed 50 lines
+- **Single Responsibility**: One method, one purpose
+- **Example**: If a method does "load, cache, and parse", extract 3 methods
 
-### Quality Metrics:
-- **Overall Coverage**: ~28% (Target: 95%)
-- **Core Module Coverage**:
-  - INI Source: 97.01% ✅
-  - EnvironmentSource: 93.99% ✅
-  - BaseSource: 89.47% ✅
-  - Validation: 85.06% ✅ (improved from 12.12% → 41.27% → 85.06%)
-  - JsonSource: 83.91% ✅
-  - YamlSource: 83.80% ✅
-  - Cache: 80.29% ✅ (improved from 21.51% → 68.02% → 80.29%)
-  - ConfigManager: 64.54% ⚠️ (improved from 12.94% → 44.15% → 57.62% → 64.54%)
-  - TomlSource: 35.05% ⚠️ (improved from 8%)
-- **Comprehensive Test Suite**: 430+ tests (138 ConfigManager, 87 Validation, 76 Cache, 33 INI, 30 JSON, 30 YAML, 27 TOML, 20 Environment)
-- **Overall Test Suite**: 127 ConfigManager tests passing (11 skipped), 400+ total passing
-- **Known Bugs**: None in tested modules
+### Documentation Requirements
+- **All public methods** require Google-style docstrings:
+  ```python
+  def get_int(self, key: str, default: Optional[int] = None) -> int:
+      """Get configuration value as integer with type conversion.
+      
+      Args:
+          key: Dot-notation path (e.g., 'database.port')
+          default: Value returned if key not found
+          
+      Returns:
+          Integer value or default
+          
+      Raises:
+          ValueError: If value cannot be converted to int
+          
+      Example:
+          >>> port = config.get_int('server.port', 8080)
+      """
+  ```
+- **Type hints**: Required for all public methods and recommended for private methods
+- **Inline comments**: For complex logic only, prefer self-documenting code
 
-## Architecture Overview
+### Code Organization
+1. **Module structure**: Standard Python ordering
+   - Imports (stdlib, third-party, local)
+   - Constants
+   - Module-level functions
+   - Classes (public first, private last)
+2. **Class structure**:
+   - `__init__` first
+   - Public methods (alphabetically)
+   - Private methods (alphabetically)
+   - Magic methods (`__str__`, `__repr__`) last
 
-**Core Pattern**: Source Priority System - later sources override earlier ones via `_deep_update()` (recursive dict merging, not replacement).
+## Core Development Patterns
 
-**Key Components**:
-- `ConfigManager`: Main orchestrator with thread-safe operations (`_config_lock` RLock)
-- `BaseSource` + `ConfigSource` Protocol: All sources inherit from `config_manager/sources/base.py` with `load() -> Dict[str, Any]`, `is_available()`, and `SourceMetadata` tracking
-- `ValidationEngine`: Dataclass-first validation with `ValidationContext` (frozen immutable) and `ValidationResult` (performance tracking)
-- `ConfigCache`: Backend-agnostic (`EnterpriseMemoryCache`/`EnterpriseFileCache`/`NullCache`) with TTL, LRU eviction, and metrics
-- `SecretsManager`: Provider pattern for `LocalEncryptedSecrets`, `HashiCorpVaultSecrets`, `AzureKeyVaultSecrets`
-- `ProfileManager`: Environment-specific configs via `ConfigProfile` with inheritance chains
-
-## Critical Patterns
-
-### Adding Configuration Sources
+### Source Priority System
 Sources are processed in order - **last source wins** for conflicts:
 ```python
 config = ConfigManager()
@@ -103,19 +83,17 @@ config.get_bool('debug')                        # Handles "true"/"false" strings
 config.get_list('features')                     # Comma-separated string parsing
 ```
 
-### Validation with Context
-Always use `ValidationContext` for path tracking and `ValidationResult` for detailed feedback:
+### Thread Safety Pattern
+All config operations use `self._config_lock` (RLock). When modifying `_config`, invalidate `_validated_config = None`:
 ```python
-context = ValidationContext(path="database.port", level=ValidationLevel.STRICT)
-result = validator.validate(value, context)
-if not result.is_valid:
-    # result.errors, result.warnings, result.transformations available
+def your_method(self) -> None:
+    with self._config_lock:
+        # Read or write _config here
+        self._config['key'] = value
+        self._validated_config = None  # Invalidate cache
 ```
 
-### Thread Safety
-All config operations use `self._config_lock` (RLock). When modifying `_config`, invalidate `_validated_config = None`.
-
-### Caching Strategy
+### Cache Key Strategy
 File-based sources use modification time for cache keys. Remote sources cache by URL+hash:
 ```python
 # In _load_source_with_cache():
@@ -129,81 +107,168 @@ else:
     cache_key = create_cache_key("source", source_id, data_hash)
 ```
 
-### Source Implementation Pattern
-All sources follow this structure (see `BaseSource` in `sources/base.py`):
-```python
-class YourSource(BaseSource):
-    def __init__(self, path: str):
-        super().__init__(source_type="your_type", source_path=path)
-        # Your initialization
-    
-    def _do_load(self) -> Dict[str, Any]:
-        # Implement your loading logic - BaseSource handles error/metrics
-        return {"key": "value"}
-    
-    def is_available(self) -> bool:
-        # Check if source is accessible (file exists, URL reachable, etc.)
-        return Path(self._metadata.source_path).exists()
-```
+## Adding New Configuration Sources
 
-The `load()` method in `BaseSource` wraps `_do_load()` with:
+### Step-by-Step Guide
+
+1. **Create source file** in `config_manager/sources/`:
+   ```python
+   # config_manager/sources/my_source.py
+   from typing import Dict, Any
+   from .base import BaseSource
+   
+   class MySource(BaseSource):
+       """Load configuration from [your source type].
+       
+       Args:
+           path: Path to source (file, URL, etc.)
+           **kwargs: Additional source-specific options
+       """
+       def __init__(self, path: str, **kwargs):
+           super().__init__(source_type="my_source", source_path=path)
+           self._kwargs = kwargs
+   ```
+
+2. **Implement `_do_load()`**:
+   ```python
+       def _do_load(self) -> Dict[str, Any]:
+           """Load and parse configuration data.
+           
+           Returns:
+               Parsed configuration dict (empty dict on error)
+           """
+           # Your loading logic here
+           # BaseSource handles errors, logging, and metrics
+           return {"key": "value"}
+   ```
+
+3. **Implement `is_available()`**:
+   ```python
+       def is_available(self) -> bool:
+           """Check if source is accessible.
+           
+           Returns:
+               True if source can be loaded
+           """
+           # Check file exists, URL is reachable, etc.
+           from pathlib import Path
+           return Path(self._metadata.source_path).exists()
+   ```
+
+4. **Add to `sources/__init__.py`**:
+   ```python
+   from .my_source import MySource
+   
+   __all__ = [
+       # ... existing sources
+       'MySource',
+   ]
+   ```
+
+5. **Write comprehensive tests** (see Testing Requirements below)
+
+### BaseSource Features
+
+The `load()` method in `BaseSource` automatically provides:
 - Performance timing and logging (`self._logger.debug`)
 - Metadata tracking via `SourceMetadata.record_load(success, error)`
 - Graceful degradation (returns `{}` on error, never raises)
 - Availability check via `is_available()` before loading
 
-### Environment Variables Pattern
-`EnvironmentSource` supports nested structures and type parsing:
+### Environment Source Pattern
+`EnvironmentSource` converts underscore notation to nested dicts:
 ```python
 # Environment: APP_DATABASE_HOST=localhost, APP_DEBUG=true
 source = EnvironmentSource(prefix='APP_', nested=True, parse_values=True)
 # Result: {'database': {'host': 'localhost'}, 'debug': True}
 
-# Multiple prefixes
-source = EnvironmentSource(prefixes=['APP_', 'API_'], case_sensitive=False)
+# APP_DATABASE_CREDENTIALS_PASSWORD → database.credentials.password
 ```
 
-Converts underscore notation to nested dicts: `APP_DATABASE_CREDENTIALS_PASSWORD` → `database.credentials.password`
+## Testing Requirements
 
-### Secrets Integration
-Secrets are accessed via `ConfigManager` but stored separately from config:
+### Coverage Standards
+- **Minimum for production-ready**: 85% coverage
+- **Target for all modules**: 95% coverage
+- **Run coverage report**: `pytest --cov=config_manager --cov-report=term-missing`
+
+### Test Structure
+Use pytest fixtures from `tests/conftest.py`:
 ```python
-# Secrets don't merge into _config, they're queried on-demand
-password = config.get_secret('db_password')  # Returns SecretValue object
-# SecretValue has: .value, .metadata, .created_at, .last_accessed
+import pytest
 
-# Auto-masking in logs/display
-config.mask_secrets_in_display = True  # Replaces secret values with '***'
-masked = mask_sensitive_config(config._config)  # Heuristic detection
+class TestMySource:
+    """Tests for MySource configuration source."""
+    
+    def test_load_success(self, tmp_path):
+        """Test successful loading of valid config."""
+        # Arrange
+        config_file = tmp_path / "config.ext"
+        config_file.write_text("key: value")
+        source = MySource(str(config_file))
+        
+        # Act
+        result = source.load()
+        
+        # Assert
+        assert result == {"key": "value"}
+    
+    def test_load_file_not_found(self):
+        """Test graceful handling of missing file."""
+        source = MySource("nonexistent.ext")
+        result = source.load()
+        assert result == {}  # BaseSource returns empty dict on error
+    
+    def test_is_available(self, tmp_path):
+        """Test availability check."""
+        config_file = tmp_path / "config.ext"
+        source = MySource(str(config_file))
+        
+        assert not source.is_available()  # File doesn't exist
+        
+        config_file.write_text("data")
+        assert source.is_available()  # File exists now
+```
+
+### Test Categories (pytest markers)
+- `@pytest.mark.unit`: Fast, isolated tests
+- `@pytest.mark.integration`: Cross-component tests
+- `@pytest.mark.slow`: Performance/load tests
+
+### What to Test
+1. **Success cases**: Valid inputs, expected outputs
+2. **Error cases**: Invalid inputs, missing files, network errors
+3. **Edge cases**: Empty files, special characters, large files
+4. **Thread safety**: Concurrent access (for ConfigManager)
+5. **Type conversion**: All getter methods with various types
+6. **Windows specifics**: File locking, path handling
+
+### Windows File Handling Pattern
+Always use try/finally for file cleanup in tests:
+```python
+def test_with_file(tmp_path):
+    config_file = tmp_path / "test.json"
+    try:
+        config_file.write_text('{"key": "value"}')
+        # Test operations
+    finally:
+        if config_file.exists():
+            config_file.unlink()  # Explicit cleanup
 ```
 
 ## Development Workflows
 
 ### Running Tests
 ```powershell
-# All tests with coverage (95%+ required)
-pytest
+# All tests with coverage
+pytest --cov=config_manager --cov-report=term-missing
+
+# Specific test file
+pytest tests/test_config_manager.py -v
 
 # Specific test markers
 pytest -m unit
 pytest -m integration
-pytest -m "not slow"
-
-# Single test file
-pytest tests/test_config_manager.py -v
-```
-
-### Type Checking
-Zero type errors enforced via `mypy.ini` with strict flags:
-```powershell
-mypy config_manager
-```
-
-### Code Formatting
-Black (88 char) + isort with profile="black":
-```powershell
-black config_manager tests examples
-isort config_manager tests examples
 ```
 
 ### Manual Testing
@@ -213,6 +278,16 @@ python examples/basic_usage.py
 python examples/advanced_usage.py
 python examples/cache_performance.py
 ```
+
+## Common Pitfalls
+
+- **Don't** use `dict.update()` for config merging - use `_deep_update()` to preserve nested structures
+- **Don't** access `_config` without acquiring `_config_lock` in threaded contexts
+- **Don't** forget to call `profile_manager.set_active_profile()` before loading profile-specific sources
+- **Don't** return `None` from source `_do_load()` - always return `Dict[str, Any]` (empty `{}` is OK)
+- **Always** validate cache keys include source-specific identifiers (file path, URL, timestamp)
+- **Always** test new sources with `is_available()` before calling `load()`
+- **Always** use `with self._config_lock:` when reading/writing `_config` or `_sources`
 
 ## Project-Specific Conventions
 
@@ -267,19 +342,6 @@ cache = ConfigCache(
 - **Always** test new sources with `is_available()` before calling `load()`
 - **Always** use `with self._config_lock:` when reading/writing `_config` or `_sources`
 
-## Testing Patterns
-
-Fixtures in `tests/conftest.py` provide:
-- `sample_config_data()`: Standard nested config dict for tests
-- Temp file utilities for file-based source testing
-
-Test structure follows pytest markers:
-- `@pytest.mark.unit`: Fast, isolated tests
-- `@pytest.mark.integration`: Cross-component tests
-- `@pytest.mark.slow`: Performance/load tests
-
-Mock file watching with `unittest.mock.MagicMock` for auto-reload tests (avoid real file I/O).
-
 ## Source Types & Usage
 
 ### Built-in Sources
@@ -290,6 +352,62 @@ Mock file watching with `unittest.mock.MagicMock` for auto-reload tests (avoid r
 - **EnvironmentSource** (`environment.py`): Env vars with prefix filtering, nested structures
 - **RemoteSource** (`remote_source.py`): HTTP/HTTPS JSON endpoints with auth support
 - **SecretsConfigSource** (`secrets_source.py`): Encrypted secrets integration
+
+### Source Priority Example
+```python
+# Typical layered configuration setup
+config = ConfigManager()
+config.add_source(JsonSource('defaults.json'))          # Base defaults
+config.add_source(YamlSource('config.yaml'))            # App config
+config.add_source(IniSource('legacy.ini'))              # Legacy settings
+config.add_source(EnvironmentSource(prefix='APP_'))     # Runtime overrides
+config.add_source(RemoteSource('https://cfg.example.com/app'))  # Central config
+
+# Result: Remote > Env > INI > YAML > JSON (for conflicting keys)
+```
+
+## Remote Source Patterns
+
+### With Authentication
+```python
+source = RemoteSource(
+    url='https://api.example.com/config',
+    auth_token='your-token',           # Auto-adds "Bearer " prefix
+    auth_header='Authorization',       # Default header
+    timeout=30.0,
+    verify_ssl=True
+)
+```
+
+### Custom Headers
+```python
+source = RemoteSource(
+    url='https://api.example.com/config',
+    headers={
+        'X-API-Key': 'secret-key',
+        'Accept': 'application/json'
+    }
+)
+```
+
+## Key Files Reference
+
+- `config_manager/config_manager.py`: Main API, auto-reload logic (lines 1-200 for core API)
+- `config_manager/sources/base.py`: Source protocol and BaseSource implementation (lines 61-200)
+- `config_manager/sources/environment.py`: Env var parsing with nested support (lines 1-100)
+- `config_manager/validation.py`: ValidationEngine, validators (TypeValidator, RangeValidator, etc.)
+- `config_manager/cache.py`: ConfigCache with backend implementations (lines 100-300 for CacheEntry/Metrics)
+- `config_manager/secrets.py`: SecretsManager and provider implementations (lines 200-300 for providers)
+- `config_manager/profiles.py`: ProfileManager for env-specific configs (lines 1-100)
+- `pyproject.toml`: Tool configurations (black, isort, mypy, pytest settings)
+- `tests/conftest.py`: Shared test fixtures and utilities
+
+## Windows-Specific Notes
+
+Default shell is PowerShell v5.1:
+- Use `;` for command chaining (not `&&`)
+- Path separators are `\` but Python Path handles cross-platform
+- Virtual env activation: `.venv\Scripts\activate`
 
 ### Source Priority Example
 ```python

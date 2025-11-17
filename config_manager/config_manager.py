@@ -17,8 +17,47 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     WATCHDOG_AVAILABLE = False
+    FileSystemEventHandler = None  # type: ignore
 
 T = TypeVar('T')
+
+
+class _ConfigFileHandler:
+    """
+    File system event handler for configuration file watching.
+    
+    This is extracted as a module-level class to improve testability
+    and reduce complexity in ConfigManager._start_watchdog().
+    """
+    
+    def __init__(self, config_manager: 'ConfigManager'):
+        """
+        Initialize file handler.
+        
+        Args:
+            config_manager: ConfigManager instance to notify on changes.
+        """
+        self.config_manager = config_manager
+    
+    def on_modified(self, event):
+        """
+        Handle file modification events.
+        
+        Args:
+            event: File system event from watchdog.
+        """
+        if not event.is_directory:
+            # Check if this is one of our watched files
+            file_path = os.path.abspath(event.src_path)
+            if file_path in self.config_manager._watched_files:
+                self.config_manager._debounced_reload()
+
+
+# Make it compatible with FileSystemEventHandler if watchdog is available
+if WATCHDOG_AVAILABLE and FileSystemEventHandler is not None:
+    _ConfigFileHandler = type('_ConfigFileHandler', 
+                              (FileSystemEventHandler,), 
+                              dict(_ConfigFileHandler.__dict__))
 
 class ConfigManager:
     """
@@ -184,38 +223,73 @@ class ConfigManager:
         if not self._enable_caching:
             return source.load()
         
-        # Generate cache key based on source type and identifier
-        source_id = self._get_source_cache_id(source)
-        
-        # For sources with file paths, include file modification time
-        cache_key = None
-        if hasattr(source, '_file_path'):
-            file_path = getattr(source, '_file_path')
-            if os.path.exists(file_path):
-                mtime = os.path.getmtime(file_path)
-                cache_key = create_cache_key("source", source_id, str(mtime))
-        
-        # For remote sources or sources without files, use content hash
+        cache_key = self._generate_cache_key(source)
         if cache_key is None:
-            try:
-                # Try to load and hash the data
-                data = source.load()
-                data_hash = hash_config_data(data)
-                cache_key = create_cache_key("source", source_id, data_hash)
-                
-                # Cache the result
-                self._cache.set(cache_key, data)
-                return data
-            except Exception:
-                # If loading fails, don't cache
-                return source.load()
+            # Dynamic sources without stable keys - load and cache by content hash
+            return self._load_and_cache_by_content(source)
         
-        # Check cache first
+        # Check cache first for file-based sources
         cached_data = self._cache.get(cache_key)
         if cached_data is not None:
             return cached_data
         
         # Load from source and cache
+        return self._load_and_cache(source, cache_key)
+    
+    def _generate_cache_key(self, source: Any) -> Optional[str]:
+        """
+        Generate a cache key for a source. Returns None for dynamic sources.
+        
+        Args:
+            source: Configuration source.
+            
+        Returns:
+            Cache key string or None for dynamic sources.
+        """
+        source_id = self._get_source_cache_id(source)
+        
+        # File-based sources use modification time
+        if hasattr(source, '_file_path'):
+            file_path = getattr(source, '_file_path')
+            if os.path.exists(file_path):
+                mtime = os.path.getmtime(file_path)
+                return create_cache_key("source", source_id, str(mtime))
+        
+        # Dynamic sources (remote, generated) return None
+        return None
+    
+    def _load_and_cache_by_content(self, source: Any) -> Dict[str, Any]:
+        """
+        Load source and cache by content hash (for dynamic sources).
+        
+        Args:
+            source: Configuration source.
+            
+        Returns:
+            Configuration data dictionary.
+        """
+        try:
+            data = source.load()
+            source_id = self._get_source_cache_id(source)
+            data_hash = hash_config_data(data)
+            cache_key = create_cache_key("source", source_id, data_hash)
+            self._cache.set(cache_key, data)
+            return data
+        except Exception:
+            # If loading fails, don't cache
+            return source.load()
+    
+    def _load_and_cache(self, source: Any, cache_key: str) -> Dict[str, Any]:
+        """
+        Load source data and store in cache.
+        
+        Args:
+            source: Configuration source.
+            cache_key: Cache key to use.
+            
+        Returns:
+            Configuration data dictionary.
+        """
         try:
             data = source.load()
             self._cache.set(cache_key, data)
@@ -282,6 +356,27 @@ class ConfigManager:
             The value for the key, or the default if not found.
         """
         return self._get_nested(key, default)
+    
+    def _convert_value(self, value: Any, converter: Callable[[Any], T], 
+                      default: Optional[T] = None) -> Optional[T]:
+        """
+        Generic value conversion with error handling.
+        
+        Args:
+            value: Value to convert.
+            converter: Conversion function.
+            default: Default value to return on conversion failure.
+            
+        Returns:
+            Converted value or default.
+        """
+        if value is None or value == default:
+            return default
+        
+        try:
+            return converter(value)
+        except (ValueError, TypeError):
+            return default
 
     def get_int(self, key: str, default: Optional[int] = None) -> Optional[int]:
         """
@@ -296,13 +391,7 @@ class ConfigManager:
             If the value cannot be converted to an integer, the default is returned.
         """
         value = self._get_nested(key, default)
-        if value is None or value == default:
-            return default
-        
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            return default
+        return self._convert_value(value, int, default)
 
     def get_float(self, key: str, default: Optional[float] = None) -> Optional[float]:
         """
@@ -317,13 +406,7 @@ class ConfigManager:
             If the value cannot be converted to a float, the default is returned.
         """
         value = self._get_nested(key, default)
-        if value is None or value == default:
-            return default
-        
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return default
+        return self._convert_value(value, float, default)
 
     def get_bool(self, key: str, default: Optional[bool] = None) -> Optional[bool]:
         """
@@ -342,25 +425,35 @@ class ConfigManager:
             String values 'false', 'no', 'n', 'off', and '0' (case insensitive) are converted to False.
         """
         value = self._get_nested(key, default)
-        if value is None or value == default:
-            return default
+        return self._convert_value(value, self._to_bool, default)
+    
+    def _to_bool(self, value: Any) -> bool:
+        """
+        Convert value to boolean with smart string handling.
         
+        Args:
+            value: Value to convert.
+            
+        Returns:
+            Boolean value.
+            
+        Raises:
+            ValueError: If value cannot be converted.
+        """
         if isinstance(value, bool):
             return value
         
         if isinstance(value, (int, float)):
             return bool(value)
         
-        # Handle string values
         if isinstance(value, str):
-            value = value.lower()
-            if value in ('true', 'yes', 'y', 'on', '1'):
+            value_lower = value.lower()
+            if value_lower in ('true', 'yes', 'y', 'on', '1'):
                 return True
-            if value in ('false', 'no', 'n', 'off', '0'):
+            if value_lower in ('false', 'no', 'n', 'off', '0'):
                 return False
         
-        # If we got here, we can't convert the value, so return the default
-        return default
+        raise ValueError(f"Cannot convert {value!r} to boolean")
 
     def get_list(self, key: str, default: Optional[List[Any]] = None) -> Optional[List[Any]]:
         """
@@ -375,14 +468,32 @@ class ConfigManager:
             The value as a list, or the default if not found.
         """
         value = self._get_nested(key, default)
-        if value is None or value == default:
-            return default
+        return self._convert_value(value, self._to_list, default)
+    
+    def _to_list(self, value: Any) -> List[Any]:
+        """
+        Convert value to list with smart string parsing.
         
+        Args:
+            value: Value to convert.
+            
+        Returns:
+            List value.
+            
+        Raises:
+            ValueError: If value cannot be converted.
+        """
         if isinstance(value, list):
             return value
         
         if isinstance(value, str):
             return [item.strip() for item in value.split(',')]
+        
+        # For other types, wrap in list
+        if value is not None:
+            return [value]
+        
+        raise ValueError(f"Cannot convert {value!r} to list")
         
         return [value]
 
@@ -540,20 +651,9 @@ class ConfigManager:
         """Start file watching using the watchdog library."""
         if not WATCHDOG_AVAILABLE:
             return
-            
-        class ConfigFileHandler(FileSystemEventHandler):
-            def __init__(self, config_manager):
-                self.config_manager = config_manager
-                
-            def on_modified(self, event):
-                if not event.is_directory:
-                    # Check if this is one of our watched files
-                    file_path = os.path.abspath(event.src_path)
-                    if file_path in self.config_manager._watched_files:
-                        self.config_manager._debounced_reload()
 
         self._observer = Observer()
-        self._file_handler = ConfigFileHandler(self)
+        self._file_handler = _ConfigFileHandler(self)
         
         # Watch all directories containing our config files
         watched_dirs = set()
@@ -762,35 +862,89 @@ class ConfigManager:
             # Loads app.production.yaml for production profile  
             config.add_profile_source('app.yaml', profile='production')
         """
-        from .sources import JsonSource, YamlSource, TomlSource, IniSource
-        
         profile_name = profile or self._current_profile or 'development'
         base_path = Path(base_path)
         
-        # Auto-detect source type from extension
-        if source_type is None:
-            if base_path.suffix:
-                extension = base_path.suffix[1:].lower()  # Remove the dot
-            else:
-                extension = 'json'  # Default to JSON
-        else:
-            extension = source_type.lower()
+        # Detect file extension
+        extension = self._detect_source_extension(base_path, source_type)
         
-        # Create profile-specific path
+        # Resolve profile-specific file path
+        profile_path = self._resolve_profile_path(base_path, profile_name, extension, fallback_to_base)
+        
+        # Create and add source
+        self._add_source_by_extension(profile_path, extension, fallback_to_base)
+        
+        return self
+    
+    def _detect_source_extension(self, base_path: Path, source_type: Optional[str]) -> str:
+        """
+        Detect source file extension from path or explicit type.
+        
+        Args:
+            base_path: Base file or directory path.
+            source_type: Explicit source type or None for auto-detection.
+            
+        Returns:
+            File extension string (without dot).
+        """
+        if source_type is not None:
+            return source_type.lower()
+        
+        if base_path.suffix:
+            return base_path.suffix[1:].lower()  # Remove the dot
+        
+        return 'json'  # Default to JSON
+    
+    def _resolve_profile_path(self, base_path: Path, profile_name: str, 
+                             extension: str, fallback_to_base: bool) -> str:
+        """
+        Resolve profile-specific file path with fallback logic.
+        
+        Args:
+            base_path: Base file or directory path.
+            profile_name: Profile name.
+            extension: File extension.
+            fallback_to_base: Whether to fall back to base file if profile file missing.
+            
+        Returns:
+            Resolved file path string.
+        """
         profile_path = create_profile_source_path(base_path, profile_name, extension)
         
         # Check if profile file exists
-        if not Path(profile_path).exists() and fallback_to_base:
-            # Fall back to base file if profile file doesn't exist
-            if base_path.is_file() or base_path.suffix:
-                profile_path = str(base_path)
-            else:
-                # Try base file with same extension
-                base_file = base_path / f"base.{extension}"
-                if base_file.exists():
-                    profile_path = str(base_file)
+        if Path(profile_path).exists():
+            return profile_path
         
-        # Create appropriate source
+        if not fallback_to_base:
+            return profile_path
+        
+        # Fall back to base file
+        if base_path.is_file() or base_path.suffix:
+            return str(base_path)
+        
+        # Try base file with same extension
+        base_file = base_path / f"base.{extension}"
+        if base_file.exists():
+            return str(base_file)
+        
+        return profile_path  # Return profile path even if doesn't exist
+    
+    def _add_source_by_extension(self, file_path: str, extension: str, 
+                                allow_missing: bool = False) -> None:
+        """
+        Create and add source by file extension.
+        
+        Args:
+            file_path: Configuration file path.
+            extension: File extension.
+            allow_missing: Whether to allow missing files.
+            
+        Raises:
+            ValueError: If extension is not supported.
+            FileNotFoundError: If file not found and allow_missing=False.
+        """
+        from .sources import JsonSource, YamlSource, TomlSource, IniSource
+        
         source_classes = {
             'json': JsonSource,
             'yaml': YamlSource,
@@ -804,17 +958,12 @@ class ConfigManager:
         if not source_class:
             raise ValueError(f"Unsupported source type: {extension}")
         
-        # Add the source
         try:
-            source = source_class(profile_path)
+            source = source_class(file_path)
             self.add_source(source)
         except FileNotFoundError:
-            if not fallback_to_base:
+            if not allow_missing:
                 raise
-            # If fallback is enabled but file still doesn't exist, that's okay
-            # This allows for optional profile-specific configs
-        
-        return self
     
     def detect_environment(self) -> str:
         """
