@@ -490,7 +490,8 @@ def run_secrets_tests():
     if result.errors:
         print("\nErrors:")
         for test, traceback in result.errors:
-            print(f"  - {test}: {traceback.split('\\n')[-2]}")
+            lines = traceback.split('\n')
+            print(f"  - {test}: {lines[-2]}")
     
     success = len(result.failures) == 0 and len(result.errors) == 0
     print(f"\n🎯 Overall result: {'SUCCESS' if success else 'FAILED'}")
