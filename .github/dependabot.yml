@@ -1,0 +1,59 @@
+version: 2
+updates:
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # Maintain dependencies for pip (Python)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Group development dependencies together
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "isort"
+          - "mypy"
+          - "flake8"
+          - "coverage"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignore major version updates for stable dependencies
+    ignore:
+      - dependency-name: "pytest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "black"
+        update-types: ["version-update:semver-major"]
+    # Security updates always get their own PR
+    open-pull-requests-limit: 10
+    reviewers:
+      - "sirhCC"
+    assignees:
+      - "sirhCC"
+
+  # Optional: Maintain dependencies for Docker if you add Dockerfiles later
+  # - package-ecosystem: "docker"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   labels:
+  #     - "dependencies"
+  #     - "docker"
