@@ -11,10 +11,12 @@
 ### **P0 - Critical (Production Blockers)**
 
 #### 1. Complete Core Module Testing
+
 **Current:** 44.15% coverage | **Target:** 90%+  
 **Module:** `config_manager/config_manager.py`
 
 **Missing Coverage:**
+
 - Auto-reload functionality (file watching, polling)
 - Schema validation integration
 - Profile management methods
@@ -24,6 +26,7 @@
 - Concurrent modification scenarios
 
 **Tests Needed:**
+
 - Auto-reload with file watching (watchdog)
 - Auto-reload with polling fallback
 - Reload callbacks and event handling
@@ -38,10 +41,12 @@
 ---
 
 #### 2. Validation Engine Comprehensive Testing
+
 **Current:** 12.12% coverage | **Target:** 85%+  
 **Module:** `config_manager/validation.py`
 
 **Missing Coverage:**
+
 - TypeValidator for all Python types
 - RangeValidator (min/max bounds)
 - RegexValidator pattern matching
@@ -53,6 +58,7 @@
 - Strict vs lenient validation modes
 
 **Tests Needed:**
+
 - Type coercion and validation
 - Range validation (numeric, string length, list size)
 - Pattern matching with regex
@@ -68,10 +74,12 @@
 ---
 
 #### 3. Cache System Enterprise Testing
+
 **Current:** 21.51% coverage | **Target:** 85%+  
 **Module:** `config_manager/cache.py`
 
 **Missing Coverage:**
+
 - EnterpriseMemoryCache LRU eviction
 - EnterpriseMemoryCache TTL expiration
 - EnterpriseFileCache persistence
@@ -83,6 +91,7 @@
 - Cache cleanup and pruning
 
 **Tests Needed:**
+
 - LRU eviction under memory pressure
 - TTL expiration with time mocking
 - File cache persistence across restarts
@@ -100,10 +109,12 @@
 ### **P1 - High Priority (Near Production)**
 
 #### 4. INI Source Production Readiness
+
 **Current:** 13.43% coverage | **Target:** 85%+  
 **Module:** `config_manager/sources/ini_source.py`
 
 **Missing Coverage:**
+
 - Section-based loading
 - Type conversion from INI strings
 - ConfigParser interpolation
@@ -114,6 +125,7 @@
 - Legacy format compatibility
 
 **Tests Needed:**
+
 - Load specific sections
 - Load all sections
 - Type parsing (bool, int, float)
@@ -129,16 +141,19 @@
 ---
 
 #### 5. BaseSource Edge Case Coverage
+
 **Current:** 89.47% coverage | **Target:** 95%+  
 **Module:** `config_manager/sources/base.py`
 
 **Missing Coverage (Lines 50, 54, 58, 180-181, 201, 205):**
+
 - File size tracking errors
 - Permission errors during metadata collection
 - Non-file source availability checks
-- Edge cases in __repr__ formatting
+- Edge cases in **repr** formatting
 
 **Tests Needed:**
+
 - Unreadable files (permission denied)
 - Metadata for non-file sources
 - Large file handling
@@ -150,10 +165,12 @@
 ---
 
 #### 6. TOML Source Continued Improvement
+
 **Current:** 35.05% coverage | **Target:** 85%+  
 **Module:** `config_manager/sources/toml_source.py`
 
 **Missing Coverage (Lines 95-123, 157, 169-170, 177-179, 191, 195, 198-226, 249-289, 293-324, 338):**
+
 - Simple fallback parser
 - Parser selection logic for tomli
 - Legacy toml library support
@@ -162,6 +179,7 @@
 - Preview validation
 
 **Tests Needed:**
+
 - Force fallback parser usage
 - Test with tomli library
 - Test with legacy toml library
@@ -177,10 +195,12 @@
 ### **P2 - Medium Priority (Nice to Have)**
 
 #### 7. Secrets Management Testing
+
 **Current:** 15.84% coverage | **Target:** 85%+  
 **Module:** `config_manager/secrets.py`
 
 **Missing Coverage:**
+
 - LocalEncryptedSecrets encryption/decryption
 - HashiCorpVaultSecrets integration
 - AzureKeyVaultSecrets integration
@@ -191,6 +211,7 @@
 - Secret callbacks
 
 **Tests Needed:**
+
 - Encryption key generation
 - Encrypt/decrypt round-trip
 - Vault authentication
@@ -206,10 +227,12 @@
 ---
 
 #### 8. Remote Source Production Readiness
+
 **Current:** 19.20% coverage | **Target:** 85%+  
 **Module:** `config_manager/sources/remote_source.py`
 
 **Missing Coverage:**
+
 - HTTP authentication (Bearer, Basic, API key)
 - Request timeout handling
 - SSL certificate verification
@@ -220,6 +243,7 @@
 - Connection pooling
 
 **Tests Needed:**
+
 - Bearer token authentication
 - Basic auth
 - API key in headers
@@ -235,10 +259,12 @@
 ---
 
 #### 9. Schema System Integration
+
 **Current:** 22.74% coverage | **Target:** 85%+  
 **Module:** `config_manager/schema.py`
 
 **Missing Coverage:**
+
 - SchemaField validation
 - FieldMetadata tracking
 - Schema inheritance
@@ -249,6 +275,7 @@
 - Schema serialization
 
 **Tests Needed:**
+
 - Field validators
 - Required vs optional fields
 - Default value handling
@@ -264,10 +291,12 @@
 ---
 
 #### 10. Profile System Enhancement
+
 **Current:** 14.29% coverage | **Target:** 85%+  
 **Module:** `config_manager/profiles.py`
 
 **Missing Coverage:**
+
 - Profile inheritance chains
 - Profile variable substitution
 - Profile-specific sources
@@ -277,6 +306,7 @@
 - Profile source path resolution
 
 **Tests Needed:**
+
 - Multi-level inheritance
 - Variable interpolation
 - Profile switching
@@ -291,12 +321,14 @@
 ---
 
 #### 11. Secrets Source Implementation
+
 **Current:** 0% coverage | **Target:** 85%+  
 **Module:** `config_manager/sources/secrets_source.py`
 
 **Status:** Not implemented - 170 lines of skeleton code
 
 **Implementation Needed:**
+
 - SecretsConfigSource basic loading
 - Integration with SecretsManager
 - Secret key filtering
@@ -305,6 +337,7 @@
 - Secret refresh logic
 
 **Tests Needed:**
+
 - Basic secret loading
 - Integration with providers
 - Secret filtering
@@ -319,15 +352,18 @@
 ## 🔧 Code Quality Improvements
 
 ### **CQ1 - Type Safety**
+
 **Status:** Good foundation, needs consistency
 
 **Issues:**
+
 - Some methods missing return type hints
 - Optional types not consistently used
 - Generic types could be more specific
 - Protocol definitions incomplete
 
 **Actions:**
+
 - Add type hints to all public methods
 - Use `Optional[T]` consistently
 - Define TypedDict for complex dicts
@@ -340,15 +376,18 @@
 ---
 
 ### **CQ2 - Error Messages**
+
 **Status:** Adequate, could be more helpful
 
 **Issues:**
+
 - Generic error messages
 - Missing context in exceptions
 - No error codes for programmatic handling
 - Limited troubleshooting guidance
 
 **Actions:**
+
 - Add detailed error context
 - Include file paths and line numbers
 - Create error code taxonomy
@@ -361,15 +400,18 @@
 ---
 
 ### **CQ3 - Logging Consistency**
+
 **Status:** Good, needs standardization
 
 **Issues:**
+
 - Log levels not always appropriate
 - Missing structured logging fields
 - No performance logging
 - Inconsistent log message formats
 
 **Actions:**
+
 - Standardize log levels (DEBUG/INFO/WARNING/ERROR)
 - Add structured fields (duration, size, path)
 - Log performance metrics
@@ -381,15 +423,18 @@
 ---
 
 ### **CQ4 - Documentation**
+
 **Status:** Good docstrings, missing guides
 
 **Issues:**
+
 - Missing "How-To" guides
 - No architecture diagrams
 - Limited migration guides
 - Few real-world examples
 
 **Actions:**
+
 - Create quick-start guide
 - Add architecture documentation
 - Write migration guides (from configparser, etc.)
@@ -404,16 +449,19 @@
 ## ⚡ Performance Improvements
 
 ### **PERF1 - Cache Optimization**
+
 **Current:** Basic caching implemented  
 **Target:** Sub-millisecond cache hits
 
 **Issues:**
+
 - Cache key generation expensive
 - No cache warming
 - No prefetching
 - LRU could be more efficient
 
 **Actions:**
+
 - Use faster hash functions (xxhash)
 - Implement cache warming on startup
 - Add prefetch hints for related keys
@@ -426,16 +474,19 @@
 ---
 
 ### **PERF2 - Lazy Loading**
+
 **Current:** All sources loaded eagerly  
 **Target:** Load-on-demand for large configs
 
 **Issues:**
+
 - All sources loaded at initialization
 - Large YAML/JSON files parsed upfront
 - Remote sources fetched eagerly
 - No streaming support
 
 **Actions:**
+
 - Implement lazy source loading
 - Add streaming parsers for large files
 - Cache parsed results
@@ -448,16 +499,19 @@
 ---
 
 ### **PERF3 - Deep Merge Optimization**
+
 **Current:** Recursive dict merge works but unoptimized  
 **Target:** 10x faster for nested configs
 
 **Issues:**
+
 - No copy-on-write
 - Unnecessary copying
 - No short-circuit for identical values
 - Allocates temp dicts
 
 **Actions:**
+
 - Implement copy-on-write strategy
 - Add identity checks
 - Use iterative instead of recursive
@@ -470,16 +524,19 @@
 ---
 
 ### **PERF4 - Validation Performance**
+
 **Current:** Validates entire config tree  
 **Target:** Incremental validation
 
 **Issues:**
+
 - Validates entire config on every change
 - No validation result caching
 - Slow regex validators
 - Deep nesting overhead
 
 **Actions:**
+
 - Implement incremental validation
 - Cache validation results with invalidation
 - Optimize regex compilation
@@ -494,16 +551,19 @@
 ## 🚀 Feature Enhancements
 
 ### **FEAT1 - Configuration Encryption**
+
 **Status:** Not implemented  
 **Priority:** HIGH
 
 **Description:**
+
 - Encrypt entire config files at rest
 - Transparent decryption on load
 - Key rotation support
 - KMS integration (AWS, Azure, GCP)
 
 **Use Cases:**
+
 - Storing configs in version control
 - Compliance requirements (PCI, HIPAA)
 - Multi-tenant applications
@@ -514,16 +574,19 @@
 ---
 
 ### **FEAT2 - Configuration Diff/Merge Tools**
+
 **Status:** Not implemented  
 **Priority:** MEDIUM
 
 **Description:**
+
 - Diff two config states
 - Smart merge with conflict resolution
 - Configuration history tracking
 - Rollback support
 
 **Use Cases:**
+
 - Debugging config changes
 - Configuration auditing
 - Gradual rollouts
@@ -534,16 +597,19 @@
 ---
 
 ### **FEAT3 - Configuration Validation UI**
+
 **Status:** Not implemented  
 **Priority:** LOW
 
 **Description:**
+
 - Web UI for config validation
 - Interactive schema editor
 - Real-time validation feedback
 - Configuration explorer
 
 **Use Cases:**
+
 - Non-developers editing configs
 - Configuration documentation
 - Training and onboarding
@@ -554,16 +620,19 @@
 ---
 
 ### **FEAT4 - Configuration Export**
+
 **Status:** Partially implemented  
 **Priority:** MEDIUM
 
 **Description:**
+
 - Export to JSON, YAML, TOML, INI
 - Format conversion utilities
 - Template generation
 - Environment-specific exports
 
 **Use Cases:**
+
 - Migrating between formats
 - Documentation generation
 - Configuration as code
@@ -574,16 +643,19 @@
 ---
 
 ### **FEAT5 - Dynamic Configuration**
+
 **Status:** Not implemented  
 **Priority:** HIGH
 
 **Description:**
+
 - Watch for config changes
 - Hot reload without restart
 - Configuration webhooks
 - Pub/sub integration
 
 **Use Cases:**
+
 - Feature flags
 - A/B testing
 - Runtime tuning
@@ -595,16 +667,19 @@
 ---
 
 ### **FEAT6 - Configuration Templates**
+
 **Status:** Not implemented  
 **Priority:** MEDIUM
 
 **Description:**
+
 - Jinja2 template support
 - Variable substitution
 - Conditional includes
 - Loop/iteration support
 
 **Use Cases:**
+
 - DRY configuration
 - Multi-environment configs
 - Configuration generation
@@ -615,16 +690,19 @@
 ---
 
 ### **FEAT7 - Configuration Validation CLI**
+
 **Status:** Not implemented  
 **Priority:** MEDIUM
 
 **Description:**
+
 - Command-line validation tool
 - Schema checking
 - Linting and best practices
 - CI/CD integration
 
 **Use Cases:**
+
 - Pre-commit hooks
 - CI/CD pipelines
 - Configuration auditing
@@ -635,10 +713,12 @@
 ---
 
 ### **FEAT8 - Cloud Provider Integrations**
+
 **Status:** Partially implemented (Azure/Vault)  
 **Priority:** HIGH
 
 **Description:**
+
 - AWS Secrets Manager
 - AWS Systems Manager Parameter Store
 - GCP Secret Manager
@@ -646,6 +726,7 @@
 - Consul KV store
 
 **Use Cases:**
+
 - Cloud-native applications
 - Container orchestration
 - Microservices architecture
@@ -658,6 +739,7 @@
 ## 📊 Testing Strategy
 
 ### **Test Coverage Goals**
+
 - **Overall:** 28% → 95%+
 - **Core modules:** 90%+ each
 - **Optional modules:** 85%+ each
@@ -667,6 +749,7 @@
 ### **Test Categories**
 
 #### Unit Tests
+
 - ✅ Source loading (140 tests passing)
 - ⚠️ Validation (needs 50+ tests)
 - ⚠️ Caching (needs 40+ tests)
@@ -674,6 +757,7 @@
 - ⚠️ Profiles (needs 25+ tests)
 
 #### Integration Tests
+
 - ⚠️ Multi-source priority (basic coverage)
 - ❌ Auto-reload scenarios
 - ❌ Schema + validation flow
@@ -681,6 +765,7 @@
 - ❌ Secrets + masking
 
 #### Performance Tests
+
 - ❌ Large file loading (10MB+ configs)
 - ❌ Deep nesting (100+ levels)
 - ❌ Concurrent access (1000+ threads)
@@ -688,6 +773,7 @@
 - ❌ Reload latency (<100ms)
 
 #### End-to-End Tests
+
 - ❌ Full application lifecycle
 - ❌ Real-world configurations
 - ❌ Error recovery scenarios
@@ -698,6 +784,7 @@
 ## 🗓️ Recommended Implementation Order
 
 ### **Phase 1: Production Readiness (Week 1-2)**
+
 1. Complete ConfigManager testing (44% → 90%)
 2. Complete Validation testing (12% → 85%)
 3. Complete Cache testing (21% → 85%)
@@ -709,6 +796,7 @@
 ---
 
 ### **Phase 2: Source Completion (Week 3)**
+
 1. INI Source to 85%+
 2. TOML Source to 85%+
 3. BaseSource to 95%+
@@ -719,6 +807,7 @@
 ---
 
 ### **Phase 3: Advanced Features (Week 4)**
+
 1. Schema system completion
 2. Secrets management testing
 3. Profile system enhancement
@@ -729,6 +818,7 @@
 ---
 
 ### **Phase 4: Performance & Scale (Week 5)**
+
 1. Performance profiling
 2. Cache optimization
 3. Lazy loading
@@ -739,6 +829,7 @@
 ---
 
 ### **Phase 5: Cloud & Ecosystem (Week 6+)**
+
 1. Cloud provider integrations
 2. Dynamic configuration
 3. Configuration diff/merge
@@ -751,6 +842,7 @@
 ## 📈 Success Metrics
 
 ### **Code Quality**
+
 - [ ] 95%+ test coverage
 - [ ] 0 mypy errors in strict mode
 - [ ] 0 failing tests
@@ -758,6 +850,7 @@
 - [ ] A+ on pylint/flake8
 
 ### **Performance**
+
 - [ ] <10ms config load (small files)
 - [ ] <100ms reload latency
 - [ ] >95% cache hit rate
@@ -765,6 +858,7 @@
 - [ ] Support 100+ concurrent threads
 
 ### **Documentation**
+
 - [ ] Complete API documentation
 - [ ] 10+ how-to guides
 - [ ] 5+ real-world examples
@@ -772,6 +866,7 @@
 - [ ] Migration guides
 
 ### **Adoption**
+
 - [ ] PyPI package published
 - [ ] 100+ GitHub stars
 - [ ] 10+ external contributors
@@ -783,6 +878,7 @@
 ## 🐛 Known Issues
 
 ### **High Priority Bugs**
+
 1. ✅ ~~EnvironmentSource empty prefix bug~~ - FIXED
 2. ✅ ~~test_secrets_management.py f-string syntax error~~ - FIXED
 3. ❌ 57 failing tests in other modules (not comprehensive tests)
@@ -791,6 +887,7 @@
 6. ❌ Thread safety not verified under high concurrency
 
 ### **Medium Priority Issues**
+
 1. ⚠️ Cache invalidation timing issues
 2. ⚠️ Validation performance with large configs
 3. ⚠️ Profile inheritance circular dependency detection
@@ -798,6 +895,7 @@
 5. ⚠️ Schema error messages not user-friendly
 
 ### **Low Priority Issues**
+
 1. ⚠️ Log messages could be more structured
 2. ⚠️ Some error paths not tested
 3. ⚠️ Documentation could use more examples
@@ -808,24 +906,28 @@
 ## 💡 Technical Debt
 
 ### **Architecture**
+
 - Deep merge could be more efficient
 - Source priority system works but could be explicit
 - Metadata tracking duplicated across sources
 - Cache backend abstraction could be cleaner
 
 ### **Code Organization**
+
 - Some modules too large (config_manager.py: 1074 lines)
 - Validation logic scattered
 - Profile management tightly coupled
 - Secrets integration not well separated
 
 ### **Dependencies**
+
 - Optional dependencies not well documented
 - No dependency pinning strategy
 - Missing extras_require groups
 - Need dependency update policy
 
 ### **Tooling**
+
 - No pre-commit hooks
 - Missing CI/CD pipeline
 - No automated releases
@@ -836,6 +938,7 @@
 ## 🎓 Learning Resources
 
 ### **For Contributors**
+
 - [ ] CONTRIBUTING.md
 - [ ] CODE_OF_CONDUCT.md
 - [ ] Development setup guide
@@ -843,6 +946,7 @@
 - [ ] Code review checklist
 
 ### **For Users**
+
 - [ ] Getting started tutorial
 - [ ] Best practices guide
 - [ ] FAQ
