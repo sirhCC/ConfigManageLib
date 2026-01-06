@@ -336,7 +336,8 @@ class TypeValidator(Validator):
         
         # No conversion, type mismatch
         result.add_error(
-            f"Expected {self.expected_type.__name__}, got {type(value).__name__}"
+            f"Type mismatch at '{context.path}': expected {self.expected_type.__name__}, "
+            f"got {type(value).__name__}. Value: {repr(value)[:100]}"
         )
         return result
     
@@ -569,12 +570,13 @@ class RangeValidator(Validator):
             if self.min_inclusive:
                 if value < self.min_value:
                     result.add_error(
-                        f"Value {value} is below minimum {self.min_value} (inclusive)"
+                        f"Value {value} at '{context.path}' is below minimum {self.min_value} (inclusive). "
+                        f"Difference: {abs(value - self.min_value):.4g}"
                     )
             else:
                 if value <= self.min_value:
                     result.add_error(
-                        f"Value {value} is not above minimum {self.min_value} (exclusive)"
+                        f"Value {value} at '{context.path}' must be above {self.min_value} (exclusive)"
                     )
         
         # Check maximum bound
@@ -582,12 +584,13 @@ class RangeValidator(Validator):
             if self.max_inclusive:
                 if value > self.max_value:
                     result.add_error(
-                        f"Value {value} is above maximum {self.max_value} (inclusive)"
+                        f"Value {value} at '{context.path}' exceeds maximum {self.max_value} (inclusive). "
+                        f"Difference: {abs(value - self.max_value):.4g}"
                     )
             else:
                 if value >= self.max_value:
                     result.add_error(
-                        f"Value {value} is not below maximum {self.max_value} (exclusive)"
+                        f"Value {value} at '{context.path}' must be below {self.max_value} (exclusive)"
                     )
         
         return result
@@ -1048,6 +1051,34 @@ class CompositeValidator(Validator):
     - Aggregated error and warning collection
     - Performance monitoring across all validators
     - Conditional validation based on context
+    
+    Example:
+        >>> from config_manager.validation import (
+        ...     CompositeValidator, TypeValidator, RangeValidator,
+        ...     LengthValidator, ValidationContext, ValidationLevel
+        ... )
+        >>> 
+        >>> # Create a composite validator for database port
+        >>> # Must be: 1) an integer, 2) in range 1-65535
+        >>> db_port_validator = CompositeValidator(
+        ...     validators=[
+        ...         TypeValidator(int, convert=True),
+        ...         RangeValidator(min_value=1, max_value=65535)
+        ...     ],
+        ...     stop_on_first_error=True,  # Stop if type conversion fails
+        ...     require_all_pass=True       # Both validators must pass
+        ... )
+        >>> 
+        >>> # Valid port
+        >>> context = ValidationContext(path="db.port", level=ValidationLevel.LENIENT)
+        >>> result = db_port_validator.validate("5432", context)
+        >>> assert result.is_valid
+        >>> assert result.value == 5432
+        >>> 
+        >>> # Invalid port (out of range)
+        >>> result = db_port_validator.validate(99999, context)
+        >>> assert not result.is_valid
+        >>> assert any("exceeds maximum" in err for err in result.errors)
     """
     
     def __init__(
@@ -1112,6 +1143,31 @@ class ValidationEngine:
     
     This provides a high-level interface for managing complex validation workflows,
     with support for conditional validation, caching, and detailed reporting.
+    
+    Example:
+        >>> from config_manager.validation import (
+        ...     ValidationEngine, TypeValidator, RangeValidator, 
+        ...     ValidationLevel, CompositeValidator
+        ... )
+        >>> 
+        >>> # Create validation engine with lenient mode
+        >>> engine = ValidationEngine(level=ValidationLevel.LENIENT)
+        >>> 
+        >>> # Define validators for a port configuration
+        >>> port_validators = [
+        ...     TypeValidator(int, convert=True),
+        ...     RangeValidator(min_value=1, max_value=65535)
+        ... ]
+        >>> 
+        >>> # Validate a valid port
+        >>> result = engine.validate_value("8080", port_validators, path="server.port")
+        >>> assert result.is_valid
+        >>> assert result.value == 8080  # Auto-converted from string
+        >>> 
+        >>> # Validate an invalid port (out of range)
+        >>> result = engine.validate_value(99999, port_validators, path="server.port")
+        >>> assert not result.is_valid
+        >>> assert "exceeds maximum" in result.errors[0]
     """
     
     level: ValidationLevel = ValidationLevel.STRICT
