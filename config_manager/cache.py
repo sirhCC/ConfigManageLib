@@ -14,12 +14,9 @@ import json
 import logging
 from typing import Any, Dict, Optional, Union, Protocol, runtime_checkable, List, Set, Callable
 from pathlib import Path
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 
 # Configure logger for this module
@@ -356,7 +353,7 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
                 try:
                     self._cleanup_expired()
                 except Exception as e:
-                    self._logger.error(f"Error in cleanup thread: {e}")
+                    self._logger.error("Error in cleanup thread: %s", e)
         
         self._cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
         self._cleanup_thread.start()
@@ -374,7 +371,7 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
                 self._delete_entry(key, event_type=CacheEventType.EXPIRE)
             
             if expired_keys:
-                self._logger.debug(f"Auto-cleanup removed {len(expired_keys)} expired entries")
+                self._logger.debug("Auto-cleanup removed %d expired entries", len(expired_keys))
             
             return len(expired_keys)
     
@@ -434,7 +431,7 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
             self._delete_entry(key, event_type=CacheEventType.EVICT)
         
         if keys_to_evict:
-            self._logger.debug(f"Evicted {len(keys_to_evict)} entries using {self.eviction_policy.value} policy")
+            self._logger.debug("Evicted %d entries using %s policy", len(keys_to_evict), self.eviction_policy.value)
     
     def _delete_entry(self, key: str, event_type: CacheEventType = CacheEventType.DELETE) -> bool:
         """Internal method to delete an entry and update indexes."""
@@ -476,7 +473,7 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
             try:
                 callback(event_type, key, value)
             except Exception as e:
-                self._logger.warning(f"Error in event callback for {event_type}: {e}")
+                self._logger.warning("Error in event callback for %s: %s", event_type, e)
     
     def get(self, key: str) -> Optional[Any]:
         """Get a value from the cache with comprehensive monitoring."""
@@ -561,7 +558,7 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
                 self._stats.total_memory_used = 0
             
             self._fire_event(CacheEventType.CLEAR, "")
-            self._logger.debug(f"Cleared {cleared_count} cache entries")
+            self._logger.debug("Cleared %d cache entries", cleared_count)
     
     def exists(self, key: str) -> bool:
         """Check if a key exists in the cache."""
@@ -722,14 +719,14 @@ class EnterpriseFileCache(EnhancedCacheBackend):
         """Load cache metadata from disk."""
         try:
             if self._metadata_file.exists():
-                with open(self._metadata_file, 'r') as f:
+                with open(self._metadata_file, 'r', encoding='utf-8') as f:
                     metadata = json.load(f)
                     if self._stats:
                         self._stats.current_size = metadata.get('current_size', 0)
             else:
                 self._save_metadata()
         except Exception as e:
-            self._logger.warning(f"Failed to load cache metadata: {e}")
+            self._logger.warning("Failed to load cache metadata: %s", e)
             if self._stats:
                 self._stats.current_size = len(list(self.cache_dir.glob("*.cache")))
     
@@ -740,10 +737,10 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                 'current_size': self._stats.current_size if self._stats else 0,
                 'last_updated': datetime.now().isoformat()
             }
-            with open(self._metadata_file, 'w') as f:
+            with open(self._metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(metadata, f)
         except Exception as e:
-            self._logger.warning(f"Failed to save cache metadata: {e}")
+            self._logger.warning("Failed to save cache metadata: %s", e)
     
     def _get_cache_path(self, key: str) -> Path:
         """Get the file path for a cache key."""
@@ -766,7 +763,7 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                 if self._stats:
                     self._stats.evictions += 1
             except Exception as e:
-                self._logger.warning(f"Failed to remove old cache file {file_path}: {e}")
+                self._logger.warning("Failed to remove old cache file %s: %s", file_path, e)
     
     def get(self, key: str) -> Optional[Any]:
         """Get a value from the file cache."""
@@ -813,7 +810,7 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                 return value
                 
             except Exception as e:
-                self._logger.warning(f"Failed to load cache entry {key}: {e}")
+                self._logger.warning("Failed to load cache entry %s: %s", key, e)
                 cache_path.unlink(missing_ok=True)
                 if self._stats:
                     self._stats.cache_misses += 1
@@ -883,7 +880,7 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                     self._save_metadata()
                     return True
                 except Exception as e:
-                    self._logger.warning(f"Failed to delete cache file {cache_path}: {e}")
+                    self._logger.warning("Failed to delete cache file %s: %s", cache_path, e)
             
             return False
     
@@ -895,7 +892,7 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                 try:
                     cache_file.unlink()
                 except Exception as e:
-                    self._logger.warning(f"Failed to delete cache file {cache_file}: {e}")
+                    self._logger.warning("Failed to delete cache file %s: %s", cache_file, e)
             
             if self._stats:
                 self._stats.current_size = 0
@@ -948,7 +945,7 @@ class EnterpriseFileCache(EnhancedCacheBackend):
                         self._stats.current_size -= 1
                         
             except Exception as e:
-                self._logger.warning(f"Failed to check tags for {cache_file}: {e}")
+                self._logger.warning("Failed to check tags for %s: %s", cache_file, e)
         
         if deleted_count > 0:
             self._save_metadata()
@@ -1122,7 +1119,7 @@ class CacheManager:
         self._start_time = time.time()
         self._operation_times: List[float] = []
         
-        self._logger.info(f"Initialized cache manager with {type(self.backend).__name__} backend")
+        self._logger.info("Initialized cache manager with %s backend", type(self.backend).__name__)
     
     def _create_backend(self) -> EnhancedCacheBackend:
         """Create cache backend based on configuration."""
