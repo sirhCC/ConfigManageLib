@@ -272,6 +272,33 @@ class EnterpriseMemoryCache(EnhancedCacheBackend):
     - Thread-safe operations with fine-grained locking
     - Memory usage tracking and optimization
     - Event callbacks for monitoring integration
+    
+    Example:
+        >>> from config_manager.cache import EnterpriseMemoryCache, CacheEvictionPolicy
+        >>> import time
+        >>> 
+        >>> # Create cache with LRU eviction and 100-item capacity
+        >>> cache = EnterpriseMemoryCache(
+        ...     max_size=100,
+        ...     default_ttl=300.0,  # 5 minutes
+        ...     eviction_policy=CacheEvictionPolicy.LRU
+        ... )
+        >>> 
+        >>> # Store configuration data
+        >>> cache.set("db.host", "localhost", ttl=600.0, tags=["database"])
+        >>> cache.set("db.port", 5432, tags=["database"])
+        >>> 
+        >>> # Retrieve cached data
+        >>> host = cache.get("db.host")
+        >>> assert host == "localhost"
+        >>> 
+        >>> # Delete by tag
+        >>> cache.delete_by_tag("database")
+        >>> assert cache.get("db.host") is None
+        >>> 
+        >>> # Check statistics
+        >>> stats = cache.get_stats()
+        >>> print(f"Hit rate: {stats.hit_rate:.1f}%")
     """
     
     def __init__(
