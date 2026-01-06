@@ -5,10 +5,9 @@ This module provides a comprehensive validation framework with modern Python pat
 detailed error reporting, performance monitoring, and extensible validator architecture.
 """
 
-from typing import Any, Dict, List, Optional, Union, Callable, Type, Set, FrozenSet
+from typing import Any, Dict, List, Optional, Union, Callable, Type, Set
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 import re
 import logging
@@ -187,7 +186,7 @@ class Validator(ABC):
         start_time = time.perf_counter()
         
         try:
-            self._logger.debug(f"Validating value at '{context.path}' with {self.name}")
+            self._logger.debug("Validating value at '%s' with %s", context.path, self.name)
             
             result = self._do_validate(value, context)
             result.validator_name = self.name
@@ -196,13 +195,13 @@ class Validator(ABC):
             
             if result.is_valid:
                 self._logger.debug(
-                    f"Validation successful for {self.name} at '{context.path}' "
-                    f"({result.validation_time:.4f}s)"
+                    "Validation successful for %s at '%s' (%.4fs)",
+                    self.name, context.path, result.validation_time
                 )
             else:
                 self._logger.warning(
-                    f"Validation failed for {self.name} at '{context.path}': "
-                    f"{', '.join(result.errors)}"
+                    "Validation failed for %s at '%s': %s",
+                    self.name, context.path, ', '.join(result.errors)
                 )
             
             return result
@@ -210,8 +209,8 @@ class Validator(ABC):
         except Exception as e:
             validation_time = time.perf_counter() - start_time
             self._logger.error(
-                f"Validation error in {self.name} at '{context.path}': {e} "
-                f"({validation_time:.4f}s)"
+                "Validation error in %s at '%s': %s (%.4fs)",
+                self.name, context.path, e, validation_time
             )
             
             # Return failed result
@@ -1211,7 +1210,7 @@ class ValidationEngine:
         if self.cache_results:
             cache_key = self._generate_cache_key(value, validators, context)
             if cache_key in self._cache:
-                self._logger.debug(f"Cache hit for validation at '{path}'")
+                self._logger.debug("Cache hit for validation at '%s'", path)
                 return self._cache[cache_key]
         
         # Run validation
@@ -1227,9 +1226,8 @@ class ValidationEngine:
         total_time = time.perf_counter() - start_time
         
         self._logger.debug(
-            f"Validation complete for '{path}': "
-            f"{'valid' if result.is_valid else 'invalid'} "
-            f"({total_time:.4f}s total)"
+            "Validation complete for '%s': %s (%.4fs total)",
+            path, 'valid' if result.is_valid else 'invalid', total_time
         )
         
         # Cache result if enabled
