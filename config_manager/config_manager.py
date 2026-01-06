@@ -656,40 +656,54 @@ class ConfigManager:
         self._file_handler = _ConfigFileHandler(self)
         
         # Watch all directories containing our config files
+        self._schedule_directory_watches()
+        
+        self._observer.start()
+    
+    def _schedule_directory_watches(self) -> None:
+        """Schedule watches for all directories containing config files."""
         watched_dirs = set()
         for file_path in self._watched_files.keys():
             dir_path = os.path.dirname(file_path)
             if dir_path not in watched_dirs:
                 self._observer.schedule(self._file_handler, dir_path, recursive=False)
                 watched_dirs.add(dir_path)
-        
-        self._observer.start()
 
     def _start_polling(self) -> None:
         """Start file watching using polling as a fallback."""
-        def poll_files():
-            while not self._stop_watching.is_set():
-                try:
-                    changed = False
-                    with self._config_lock:
-                        for file_path, last_mtime in list(self._watched_files.items()):
-                            if os.path.exists(file_path):
-                                current_mtime = os.path.getmtime(file_path)
-                                if current_mtime > last_mtime:
-                                    self._watched_files[file_path] = current_mtime
-                                    changed = True
-                    
-                    if changed:
-                        self._debounced_reload()
-                        
-                except Exception:
-                    # Ignore errors during polling to prevent crash
-                    pass
-                    
-                self._stop_watching.wait(self._reload_interval)
-        
-        self._polling_thread = threading.Thread(target=poll_files, daemon=True)
+        self._polling_thread = threading.Thread(
+            target=self._poll_files_loop, 
+            daemon=True
+        )
         self._polling_thread.start()
+    
+    def _poll_files_loop(self) -> None:
+        """Continuously poll files for changes."""
+        while not self._stop_watching.is_set():
+            try:
+                if self._check_files_changed():
+                    self._debounced_reload()
+            except Exception:
+                # Ignore errors during polling to prevent crash
+                pass
+            
+            self._stop_watching.wait(self._reload_interval)
+    
+    def _check_files_changed(self) -> bool:
+        """Check if any watched files have changed.
+        
+        Returns:
+            True if any files changed, False otherwise.
+        """
+        changed = False
+        with self._config_lock:
+            for file_path, last_mtime in list(self._watched_files.items()):
+                if os.path.exists(file_path):
+                    current_mtime = os.path.getmtime(file_path)
+                    if current_mtime > last_mtime:
+                        self._watched_files[file_path] = current_mtime
+                        changed = True
+        return changed
 
     def _debounced_reload(self) -> None:
         """Reload configuration with debouncing to prevent rapid successive reloads."""
@@ -699,21 +713,29 @@ class ConfigManager:
         try:
             with self._config_lock:
                 self.reload()
-                
+            
             # Call all registered callbacks
-            for callback in self._reload_callbacks:
-                try:
-                    callback()
-                except Exception:
-                    # Don't let callback errors break the reload process
-                    pass
+            self._execute_reload_callbacks()
                     
         except Exception:
             # Don't let reload errors break the watching process
             pass
+    
+    def _execute_reload_callbacks(self) -> None:
+        """Execute all registered reload callbacks."""
+        for callback in self._reload_callbacks:
+            try:
+                callback()
+            except Exception:
+                # Don't let callback errors break the reload process
+                pass
 
     def _add_watched_file(self, file_path: str) -> None:
-        """Add a file to the watch list."""
+        """Add a file to the watch list.
+        
+        Args:
+            file_path: Path to file to watch.
+        """
         if not self._auto_reload:
             return
             
@@ -723,16 +745,35 @@ class ConfigManager:
             
             # If using watchdog and observer is running, add new directory watch
             if WATCHDOG_AVAILABLE and self._observer and self._observer.is_alive():
-                dir_path = os.path.dirname(abs_path)
-                # Check if we're already watching this directory
-                watching_dir = False
-                for watch in self._observer.emitters:
-                    if hasattr(watch, 'watch') and watch.watch.path == dir_path:
-                        watching_dir = True
-                        break
-                
-                if not watching_dir:
-                    self._observer.schedule(self._file_handler, dir_path, recursive=False)
+                self._add_directory_watch(abs_path)
+    
+    def _add_directory_watch(self, abs_path: str) -> None:
+        """Add directory watch if not already watching.
+        
+        Args:
+            abs_path: Absolute path to file whose directory should be watched.
+        """
+        dir_path = os.path.dirname(abs_path)
+        
+        # Check if we're already watching this directory
+        if self._is_watching_directory(dir_path):
+            return
+        
+        self._observer.schedule(self._file_handler, dir_path, recursive=False)
+    
+    def _is_watching_directory(self, dir_path: str) -> bool:
+        """Check if a directory is already being watched.
+        
+        Args:
+            dir_path: Directory path to check.
+            
+        Returns:
+            True if directory is being watched.
+        """
+        for watch in self._observer.emitters:
+            if hasattr(watch, 'watch') and watch.watch.path == dir_path:
+                return True
+        return False
 
     def stop_watching(self) -> None:
         """Stop watching for file changes and clean up resources."""
@@ -1213,10 +1254,13 @@ class ConfigManager:
     def check_secret_rotations(self) -> None:
         """Check and execute any scheduled secret rotations."""
         self._secrets_manager.check_rotations()
+    
+    def to_dict(self) -> Dict[str, Any]:
         """
         Get the full configuration as a dictionary.
         
         Returns:
             Complete configuration dictionary.
         """
-        return self._config.copy()
+        with self._config_lock:
+            return self._config.copy()
